@@ -6,7 +6,6 @@ use base64::{engine::general_purpose, Engine as _};
 use chrono::Local;
 use csv::WriterBuilder;
 use eframe::{egui, App};
-use egui_extras::RetainedImage;
 use regex::Regex;
 use rfd::FileDialog;
 use serde_json::json;
@@ -34,8 +33,168 @@ const DEFAULT_LISTEN_PORT: u16 = 14235;
 const PARK_START: u8 = 168;
 const PARK_END: u8 = 240;
 
-static BLOCKOPS_HEADER_LOGO_BYTES: &[u8] = include_bytes!("../assets/blockops_header_logo.png");
 static BLOCKOPS_APP_ICON_BYTES: &[u8] = include_bytes!("../assets/blockops_app_icon.png");
+
+fn color_app_bg() -> egui::Color32 {
+    egui::Color32::from_rgb(10, 12, 15)
+}
+
+fn color_sidebar() -> egui::Color32 {
+    egui::Color32::from_rgb(13, 15, 19)
+}
+
+fn color_surface() -> egui::Color32 {
+    egui::Color32::from_rgb(20, 23, 28)
+}
+
+fn color_surface_high() -> egui::Color32 {
+    egui::Color32::from_rgb(27, 31, 38)
+}
+
+fn color_surface_hover() -> egui::Color32 {
+    egui::Color32::from_rgb(34, 39, 48)
+}
+
+fn color_border() -> egui::Color32 {
+    egui::Color32::from_rgb(43, 49, 59)
+}
+
+fn color_text() -> egui::Color32 {
+    egui::Color32::from_rgb(238, 241, 245)
+}
+
+fn color_text_muted() -> egui::Color32 {
+    egui::Color32::from_rgb(139, 149, 163)
+}
+
+fn color_accent() -> egui::Color32 {
+    egui::Color32::from_rgb(49, 143, 232)
+}
+
+fn color_accent_soft() -> egui::Color32 {
+    egui::Color32::from_rgb(22, 45, 68)
+}
+
+fn color_success() -> egui::Color32 {
+    egui::Color32::from_rgb(48, 197, 139)
+}
+
+fn color_warning() -> egui::Color32 {
+    egui::Color32::from_rgb(235, 174, 60)
+}
+
+fn color_danger() -> egui::Color32 {
+    egui::Color32::from_rgb(226, 85, 103)
+}
+
+fn install_product_fonts(ctx: &egui::Context) -> egui::FontFamily {
+    let mut fonts = egui::FontDefinitions::default();
+    let mut display_family = egui::FontFamily::Proportional;
+
+    #[cfg(target_os = "windows")]
+    {
+        if let Ok(bytes) = std::fs::read(r"C:\Windows\Fonts\segoeui.ttf") {
+            fonts.font_data.insert(
+                "blockops_regular".to_owned(),
+                egui::FontData::from_owned(bytes),
+            );
+            if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+                family.insert(0, "blockops_regular".to_owned());
+            }
+        }
+
+        if let Ok(bytes) = std::fs::read(r"C:\Windows\Fonts\seguisb.ttf") {
+            fonts.font_data.insert(
+                "blockops_semibold".to_owned(),
+                egui::FontData::from_owned(bytes),
+            );
+            display_family = egui::FontFamily::Name("blockops_display".into());
+            fonts.families.insert(
+                display_family.clone(),
+                vec![
+                    "blockops_semibold".to_owned(),
+                    "blockops_regular".to_owned(),
+                ],
+            );
+        }
+
+        if let Ok(bytes) = std::fs::read(r"C:\Windows\Fonts\seguisym.ttf") {
+            fonts.font_data.insert(
+                "blockops_symbols".to_owned(),
+                egui::FontData::from_owned(bytes),
+            );
+            if let Some(family) = fonts.families.get_mut(&egui::FontFamily::Proportional) {
+                family.push("blockops_symbols".to_owned());
+            }
+            if let Some(family) = fonts.families.get_mut(&display_family) {
+                if !family.iter().any(|name| name == "blockops_symbols") {
+                    family.push("blockops_symbols".to_owned());
+                }
+            }
+        }
+    }
+
+    ctx.set_fonts(fonts);
+    display_family
+}
+
+fn configure_egui(ctx: &egui::Context) {
+    let display_family = install_product_fonts(ctx);
+    let mut style = (*ctx.style()).clone();
+    style.text_styles.insert(
+        egui::TextStyle::Heading,
+        egui::FontId::new(21.0, display_family.clone()),
+    );
+    style.text_styles.insert(
+        egui::TextStyle::Body,
+        egui::FontId::new(13.5, egui::FontFamily::Proportional),
+    );
+    style.text_styles.insert(
+        egui::TextStyle::Button,
+        egui::FontId::new(13.0, display_family),
+    );
+    style.text_styles.insert(
+        egui::TextStyle::Small,
+        egui::FontId::new(11.5, egui::FontFamily::Proportional),
+    );
+    style.spacing.item_spacing = egui::vec2(8.0, 8.0);
+    style.spacing.button_padding = egui::vec2(11.0, 7.0);
+    style.spacing.interact_size.y = 32.0;
+
+    let mut visuals = egui::Visuals::dark();
+    visuals.panel_fill = color_app_bg();
+    visuals.window_fill = color_surface();
+    visuals.window_stroke = egui::Stroke::new(1.0, color_border());
+    visuals.window_rounding = egui::Rounding::same(8.0);
+    visuals.menu_rounding = egui::Rounding::same(6.0);
+    visuals.extreme_bg_color = egui::Color32::from_rgb(8, 10, 13);
+    visuals.faint_bg_color = egui::Color32::from_rgb(24, 27, 33);
+    visuals.override_text_color = Some(color_text());
+    visuals.hyperlink_color = color_accent();
+    visuals.warn_fg_color = color_warning();
+    visuals.error_fg_color = color_danger();
+    visuals.selection.bg_fill = color_accent();
+    visuals.selection.stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
+    visuals.widgets.noninteractive.bg_fill = color_surface();
+    visuals.widgets.noninteractive.bg_stroke = egui::Stroke::new(1.0, color_border());
+    visuals.widgets.noninteractive.rounding = egui::Rounding::same(5.0);
+    visuals.widgets.inactive.bg_fill = color_surface_high();
+    visuals.widgets.inactive.bg_stroke = egui::Stroke::new(1.0, color_border());
+    visuals.widgets.inactive.rounding = egui::Rounding::same(5.0);
+    visuals.widgets.hovered.bg_fill = color_surface_hover();
+    visuals.widgets.hovered.bg_stroke = egui::Stroke::new(1.0, color_accent());
+    visuals.widgets.hovered.rounding = egui::Rounding::same(5.0);
+    visuals.widgets.active.bg_fill = color_accent();
+    visuals.widgets.active.bg_stroke = egui::Stroke::new(1.0, color_accent());
+    visuals.widgets.active.rounding = egui::Rounding::same(5.0);
+    visuals.widgets.open.bg_fill = color_surface_hover();
+    visuals.widgets.open.bg_stroke = egui::Stroke::new(1.0, color_accent());
+    visuals.widgets.open.rounding = egui::Rounding::same(5.0);
+    visuals.interact_cursor = Some(egui::CursorIcon::PointingHand);
+    visuals.striped = false;
+    style.visuals = visuals;
+    ctx.set_style(style);
+}
 
 #[cfg(target_os = "windows")]
 fn wide_null(s: &str) -> Vec<u16> {
@@ -51,7 +210,7 @@ fn center_window_after_startup() {
 
     thread::spawn(|| {
         // Give eframe/winit a moment to create the native window.
-        let title = wide_null("BlockOps Static IP Tool");
+        let title = wide_null("BlockOps Static IP Manager");
 
         for _ in 0..40 {
             thread::sleep(Duration::from_millis(100));
@@ -246,6 +405,23 @@ enum SlotMonitorState {
     Offline,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum AppView {
+    RackDashboard,
+    IpAssignment,
+    Settings,
+}
+
+impl AppView {
+    fn label(self) -> &'static str {
+        match self {
+            Self::RackDashboard => "Rack Dashboard",
+            Self::IpAssignment => "IP Assignment",
+            Self::Settings => "Settings",
+        }
+    }
+}
+
 impl SlotMonitorState {
     fn label(self) -> &'static str {
         match self {
@@ -322,7 +498,7 @@ fn normalize_mac(input: &str) -> String {
 }
 
 fn valid_ip(ip: &str) -> bool {
-    ip.parse::<IpAddr>().is_ok()
+    ip.parse::<Ipv4Addr>().is_ok()
 }
 
 fn parse_ipv4(ip: &str) -> Option<Ipv4Addr> {
@@ -1394,6 +1570,7 @@ fn spawn_udp_listener(
 }
 
 struct BlockOpsApp {
+    active_view: AppView,
     rows: Vec<MinerRow>,
     skips: Vec<SkipRow>,
     apply_steps: Vec<ApplyStep>,
@@ -1455,7 +1632,6 @@ struct BlockOpsApp {
 
     splash_done: bool,
     blockops_splash: BlockOpsSplash,
-    header_logo: Option<RetainedImage>,
 
     selected_line: Option<usize>,
     redo_target_ip: Option<String>,
@@ -1469,11 +1645,8 @@ impl Default for BlockOpsApp {
         let (report_tx, report_rx) = mpsc::channel();
         let (status_tx, status_rx) = mpsc::channel();
 
-        let header_logo =
-            RetainedImage::from_image_bytes("blockops_header_logo", BLOCKOPS_HEADER_LOGO_BYTES)
-                .ok();
-
         Self {
+            active_view: AppView::RackDashboard,
             rows: Vec::new(),
             skips: Vec::new(),
             apply_steps: Vec::new(),
@@ -1529,8 +1702,7 @@ impl Default for BlockOpsApp {
 
             listener_started: false,
             listener_stop: None,
-            status: "Enter Start Target IP, then press IP Report buttons in physical order."
-                .to_string(),
+            status: "Ready. Choose Rack Dashboard or IP Assignment to begin.".to_string(),
             log_path: format!(
                 "blockops_static_ip_{}.log",
                 Local::now().format("%Y%m%d_%H%M%S")
@@ -1542,7 +1714,6 @@ impl Default for BlockOpsApp {
 
             splash_done: false,
             blockops_splash: BlockOpsSplash::default(),
-            header_logo,
 
             selected_line: None,
             redo_target_ip: None,
@@ -1868,87 +2039,6 @@ impl BlockOpsApp {
         });
     }
 
-    fn render_selected_slot_details(&mut self, ui: &mut egui::Ui) {
-        let Some((rack, slot)) = self.selected_detail_slot else {
-            ui.label(
-                egui::RichText::new("Select a slot to view miner details.")
-                    .color(egui::Color32::from_rgb(205, 215, 245)),
-            );
-            return;
-        };
-
-        let target_ip = self
-            .rack_slot_target_ip(rack, slot)
-            .unwrap_or_else(|| "invalid".to_string());
-        let monitor_state = self
-            .monitor_results
-            .get(&target_ip)
-            .copied()
-            .unwrap_or(SlotMonitorState::Unknown);
-        let assignment = self.slot_assignment(&target_ip);
-
-        egui::Frame::none()
-            .fill(egui::Color32::from_rgb(34, 37, 58))
-            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(70, 76, 108)))
-            .rounding(egui::Rounding::same(6.0))
-            .inner_margin(egui::Margin::same(8.0))
-            .show(ui, |ui| {
-                ui.horizontal_wrapped(|ui| {
-                    ui.strong(
-                        egui::RichText::new(format!("Rack {} Slot {}", rack, slot))
-                            .color(egui::Color32::WHITE),
-                    );
-                    ui.separator();
-                    ui.label(
-                        egui::RichText::new(format!("Target {}", target_ip))
-                            .color(egui::Color32::from_rgb(205, 215, 245)),
-                    );
-                    ui.separator();
-                    ui.label(
-                        egui::RichText::new(format!("Monitor {}", monitor_state.label()))
-                            .color(egui::Color32::from_rgb(205, 215, 245)),
-                    );
-
-                    if let Some(details) = self.miner_details.get(&target_ip) {
-                        ui.separator();
-                        ui.label(
-                            egui::RichText::new(format!("Hashrate {}", details.hashrate))
-                                .color(egui::Color32::from_rgb(205, 215, 245)),
-                        );
-                        ui.separator();
-                        ui.label(
-                            egui::RichText::new(format!("Temp {}", details.temperature))
-                                .color(egui::Color32::from_rgb(205, 215, 245)),
-                        );
-                    }
-
-                    if let Some(row) = assignment {
-                        ui.separator();
-                        ui.label(
-                            egui::RichText::new(format!("Current {}", row.current_ip))
-                                .color(egui::Color32::from_rgb(205, 215, 245)),
-                        );
-                        ui.separator();
-                        ui.label(
-                            egui::RichText::new(format!("MAC {}", row.mac))
-                                .color(egui::Color32::from_rgb(205, 215, 245)),
-                        );
-                        ui.separator();
-                        ui.label(
-                            egui::RichText::new(format!("Apply {}", row.apply_status))
-                                .color(egui::Color32::from_rgb(205, 215, 245)),
-                        );
-                    } else {
-                        ui.separator();
-                        ui.label(
-                            egui::RichText::new("No IP Report captured for this slot yet.")
-                                .color(egui::Color32::from_rgb(205, 215, 245)),
-                        );
-                    }
-                });
-            });
-    }
-
     fn render_miner_detail_popup(&mut self, ctx: &egui::Context) {
         if self.edit_rack_map {
             return;
@@ -1984,119 +2074,121 @@ impl BlockOpsApp {
             .unwrap_or_else(|| "-".to_string());
 
         let mut open = true;
-        egui::Window::new(format!("Rack {} Slot {}", rack, slot))
+        egui::Window::new("Miner details")
+            .id(egui::Id::new("miner_detail_window"))
             .open(&mut open)
             .collapsible(false)
             .resizable(false)
-            .default_width(270.0)
+            .default_width(390.0)
             .show(ctx, |ui| {
-                egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(19, 17, 38))
-                    .rounding(egui::Rounding::same(8.0))
-                    .inner_margin(egui::Margin::same(10.0))
-                    .show(ui, |ui| {
+                ui.set_min_width(370.0);
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
                         ui.vertical(|ui| {
                             ui.label(
-                                egui::RichText::new(format!(
-                                    "{} - {}",
-                                    if details.model == "-" {
-                                        "Miner"
-                                    } else {
-                                        &details.model
-                                    },
-                                    target_ip
-                                ))
-                                .color(egui::Color32::WHITE)
-                                .strong(),
+                                egui::RichText::new(if details.model == "-" {
+                                    "Miner".to_string()
+                                } else {
+                                    details.model.clone()
+                                })
+                                .size(18.0)
+                                .strong()
+                                .color(color_text()),
                             );
                             ui.label(
                                 egui::RichText::new(format!(
-                                    "{} | {}",
-                                    details.status, details.firmware
+                                    "Rack {:02}  /  Slot {:03}  /  {}",
+                                    rack, slot, target_ip
                                 ))
-                                .color(egui::Color32::from_rgb(198, 203, 232)),
+                                .small()
+                                .color(color_text_muted()),
                             );
-
-                            ui.add_space(6.0);
-                            ui.separator();
-
-                            ui.horizontal(|ui| {
-                                detail_metric(ui, "Hashrate", &details.hashrate);
-                                detail_metric(ui, "Consumption", &details.power);
-                            });
-                            ui.horizontal(|ui| {
-                                detail_metric(ui, "Efficiency", &details.efficiency);
-                                detail_metric(ui, "Uptime", &details.uptime);
-                            });
-
-                            ui.add_space(4.0);
-                            ui.horizontal(|ui| {
-                                detail_metric(ui, "Temp", &details.temperature);
-                                detail_metric(ui, "Boards", &details.boards);
-                                detail_metric(ui, "Fans", &details.fans);
-                            });
-
-                            ui.add_space(6.0);
-                            ui.separator();
-
-                            ui.label(
-                                egui::RichText::new(format!("Pool: {}", details.pool))
-                                    .color(egui::Color32::from_rgb(198, 203, 232)),
+                        });
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            status_badge(
+                                ui,
+                                monitor_state.label(),
+                                monitor_state_color(monitor_state),
                             );
-                            ui.label(
-                                egui::RichText::new(format!("IP: {}", target_ip))
-                                    .color(egui::Color32::from_rgb(198, 203, 232)),
-                            );
-                            let mac = assignment
-                                .as_ref()
-                                .map(|row| row.mac.as_str())
-                                .filter(|mac| !mac.is_empty())
-                                .unwrap_or(&details.mac);
-                            ui.label(
-                                egui::RichText::new(format!("MAC: {}", mac))
-                                    .color(egui::Color32::from_rgb(145, 151, 188)),
-                            );
-                            ui.label(
-                                egui::RichText::new(format!("Monitor: {}", monitor_state.label()))
-                                    .color(egui::Color32::from_rgb(145, 151, 188)),
-                            );
-                            ui.label(
-                                egui::RichText::new(format!("Last seen: {}", last_seen))
-                                    .color(egui::Color32::from_rgb(145, 151, 188)),
-                            );
-                            ui.label(
-                                egui::RichText::new(format!("Last checked: {}", last_checked))
-                                    .color(egui::Color32::from_rgb(145, 151, 188)),
-                            );
-                            ui.label(
-                                egui::RichText::new(format!("Updated: {}", details.updated))
-                                    .color(egui::Color32::from_rgb(145, 151, 188)),
-                            );
-
-                            if !details.error.is_empty() {
-                                ui.add_space(4.0);
-                                ui.label(
-                                    egui::RichText::new(&details.error)
-                                        .color(egui::Color32::from_rgb(244, 190, 92)),
-                                );
-                            }
-
-                            ui.add_space(8.0);
-                            ui.horizontal(|ui| {
-                                if ui.button("Refresh").clicked() && valid_ip(&target_ip) {
-                                    self.request_miner_details(target_ip.clone());
-                                }
-                                if ui.button("Copy IP").clicked() {
-                                    ui.ctx().output_mut(|o| {
-                                        o.copied_text = target_ip.clone();
-                                    });
-                                }
-                                if ui.button("Close").clicked() {
-                                    self.selected_detail_slot = None;
-                                }
-                            });
                         });
                     });
+
+                    ui.add_space(10.0);
+                    ui.columns(2, |columns| {
+                        detail_metric(&mut columns[0], "HASHRATE", &details.hashrate);
+                        detail_metric(&mut columns[1], "POWER", &details.power);
+                    });
+                    ui.add_space(6.0);
+                    ui.columns(2, |columns| {
+                        detail_metric(&mut columns[0], "EFFICIENCY", &details.efficiency);
+                        detail_metric(&mut columns[1], "UPTIME", &details.uptime);
+                    });
+                    ui.add_space(6.0);
+                    ui.columns(3, |columns| {
+                        detail_metric(&mut columns[0], "TEMP", &details.temperature);
+                        detail_metric(&mut columns[1], "BOARDS", &details.boards);
+                        detail_metric(&mut columns[2], "FANS", &details.fans);
+                    });
+
+                    ui.add_space(12.0);
+                    section_label(ui, "DEVICE");
+                    ui.add_space(4.0);
+                    let mac = assignment
+                        .as_ref()
+                        .map(|row| row.mac.as_str())
+                        .filter(|mac| !mac.is_empty())
+                        .unwrap_or(&details.mac);
+                    egui::Grid::new("miner_detail_grid")
+                        .num_columns(2)
+                        .spacing(egui::vec2(22.0, 7.0))
+                        .show(ui, |ui| {
+                            detail_row(ui, "Firmware", &details.firmware);
+                            detail_row(ui, "Status", &details.status);
+                            detail_row(ui, "Pool", &details.pool);
+                            detail_row(ui, "IP address", &target_ip);
+                            detail_row(ui, "MAC address", mac);
+                            detail_row(ui, "Last seen", &last_seen);
+                            detail_row(ui, "Last checked", &last_checked);
+                            detail_row(ui, "API updated", &details.updated);
+                        });
+
+                    if !details.error.is_empty() {
+                        ui.add_space(8.0);
+                        egui::Frame::none()
+                            .fill(egui::Color32::from_rgb(49, 38, 20))
+                            .stroke(egui::Stroke::new(
+                                1.0,
+                                color_warning().linear_multiply(0.55),
+                            ))
+                            .rounding(egui::Rounding::same(5.0))
+                            .inner_margin(egui::Margin::symmetric(9.0, 7.0))
+                            .show(ui, |ui| {
+                                ui.label(
+                                    egui::RichText::new(&details.error)
+                                        .small()
+                                        .color(color_warning()),
+                                );
+                            });
+                    }
+
+                    ui.add_space(10.0);
+                    ui.separator();
+                    ui.horizontal(|ui| {
+                        if ui.button("↻  Refresh").clicked() && valid_ip(&target_ip) {
+                            self.request_miner_details(target_ip.clone());
+                        }
+                        if ui.button("⧉  Copy IP").clicked() {
+                            ui.ctx().output_mut(|o| {
+                                o.copied_text = target_ip.clone();
+                            });
+                        }
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            if ui.button("Close").clicked() {
+                                self.selected_detail_slot = None;
+                            }
+                        });
+                    });
+                });
             });
 
         if !open {
@@ -2319,8 +2411,30 @@ impl BlockOpsApp {
         self.scroll_to_bottom_next = true;
     }
 
-    fn select_row_for_redo(&mut self, line: usize) {
+    fn select_assignment_row(&mut self, line: usize) {
         self.selected_line = Some(line);
+
+        if let Some(row) = self.rows.iter().find(|row| row.line == line) {
+            self.status = format!(
+                "Selected line {}: {} -> {}.",
+                line, row.current_ip, row.target_ip
+            );
+        } else {
+            self.status = "Selected row no longer exists.".to_string();
+            self.selected_line = None;
+        }
+    }
+
+    fn arm_selected_row_for_redo(&mut self) {
+        if self.apply_running {
+            self.status = "Wait for the active apply batch before arming a redo.".to_string();
+            return;
+        }
+
+        let Some(line) = self.selected_line else {
+            self.status = "Select a queue row before arming redo.".to_string();
+            return;
+        };
 
         if let Some(row) = self.rows.iter().find(|r| r.line == line) {
             self.redo_target_ip = Some(row.target_ip.clone());
@@ -3117,59 +3231,243 @@ impl BlockOpsApp {
         }
     }
 
-    fn render_rack_map(&mut self, ui: &mut egui::Ui) {
-        let mut clicked_slot: Option<(usize, usize)> = None;
-        let cols = 12usize;
-        let rows_per_rack = (self.rack_size + cols - 1) / cols;
+    fn render_rack_panel(&self, ui: &mut egui::Ui, rack: usize) -> Option<usize> {
+        let mut clicked_slot = None;
+        let columns = 12usize;
+        let rows_per_rack = (self.rack_size + columns - 1) / columns;
+        let online_count = (1..=self.rack_size)
+            .filter_map(|slot| self.rack_slot_target_ip(rack, slot))
+            .filter(|ip| {
+                self.monitor_results
+                    .get(ip)
+                    .copied()
+                    .unwrap_or(SlotMonitorState::Unknown)
+                    .is_present()
+            })
+            .count();
 
         egui::Frame::none()
-            .fill(egui::Color32::from_rgb(28, 30, 49))
-            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(59, 64, 94)))
-            .rounding(egui::Rounding::same(8.0))
+            .fill(color_surface())
+            .stroke(egui::Stroke::new(1.0, color_border()))
+            .rounding(egui::Rounding::same(7.0))
             .inner_margin(egui::Margin::same(10.0))
             .show(ui, |ui| {
                 ui.horizontal(|ui| {
-                    ui.heading(egui::RichText::new("Rack Map").color(egui::Color32::WHITE));
-                    ui.separator();
+                    ui.label(
+                        egui::RichText::new(format!("Rack {:02}", rack))
+                            .size(15.0)
+                            .strong()
+                            .color(color_text()),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{} / {} online",
+                                online_count, self.rack_size
+                            ))
+                            .small()
+                            .color(
+                                if online_count == self.rack_size {
+                                    color_success()
+                                } else {
+                                    color_text_muted()
+                                },
+                            ),
+                        );
+                    });
+                });
 
-                    ui.label(egui::RichText::new("Rack 1 Slot 1 IP").color(egui::Color32::from_rgb(205, 215, 245)));
-                    ui.add_sized([110.0, 24.0], egui::TextEdit::singleline(&mut self.rack_one_slot_one_ip));
+                let progress = if self.rack_size == 0 {
+                    0.0
+                } else {
+                    online_count as f32 / self.rack_size as f32
+                };
+                let (bar_rect, _) = ui.allocate_exact_size(
+                    egui::vec2(ui.available_width(), 3.0),
+                    egui::Sense::hover(),
+                );
+                ui.painter()
+                    .rect_filled(bar_rect, egui::Rounding::same(1.5), color_surface_high());
+                if progress > 0.0 {
+                    let mut fill_rect = bar_rect;
+                    fill_rect.max.x = fill_rect.min.x + bar_rect.width() * progress;
+                    ui.painter()
+                        .rect_filled(fill_rect, egui::Rounding::same(1.5), color_success());
+                }
+                ui.add_space(5.0);
 
-                    ui.label(egui::RichText::new("Racks").color(egui::Color32::from_rgb(205, 215, 245)));
-                    ui.add(egui::DragValue::new(&mut self.rack_count).clamp_range(1..=40).speed(1));
+                let slot_gap = 3.0;
+                let slot_width = ((ui.available_width() - slot_gap * 11.0) / 12.0)
+                    .floor()
+                    .max(18.0);
+                egui::Grid::new(format!("rack_grid_{}", rack))
+                    .spacing(egui::vec2(slot_gap, 3.0))
+                    .min_col_width(0.0)
+                    .show(ui, |ui| {
+                        for row_index in 0..rows_per_rack {
+                            for column in 0..columns {
+                                let slot = row_index * columns + column + 1;
+                                if slot > self.rack_size {
+                                    ui.allocate_space(egui::vec2(slot_width, 21.0));
+                                    continue;
+                                }
 
-                    ui.label(egui::RichText::new("Slots").color(egui::Color32::from_rgb(205, 215, 245)));
-                    ui.add(egui::DragValue::new(&mut self.rack_size).clamp_range(1..=168).speed(1));
+                                let target_ip =
+                                    self.rack_slot_target_ip(rack, slot).unwrap_or_default();
+                                let assignment = self.slot_assignment(&target_ip);
+                                let selected = self.selected_rack_slot == Some((rack, slot));
+                                let monitor_state = self
+                                    .monitor_results
+                                    .get(&target_ip)
+                                    .copied()
+                                    .unwrap_or(SlotMonitorState::Unknown);
 
-                    if ui.checkbox(&mut self.edit_rack_map, "Edit mode").changed()
-                        && !self.edit_rack_map
-                    {
-                        self.armed_target_ip = None;
-                    }
+                                let fill = if selected {
+                                    color_warning()
+                                } else if let Some(row) = assignment {
+                                    if row.current_ip == row.target_ip {
+                                        color_success()
+                                    } else if row.current_ip == "SKIPPED" {
+                                        color_surface_hover()
+                                    } else {
+                                        egui::Color32::from_rgb(125, 91, 31)
+                                    }
+                                } else {
+                                    match monitor_state {
+                                        SlotMonitorState::VnishMiner => color_accent(),
+                                        SlotMonitorState::BitmainMiner => {
+                                            egui::Color32::from_rgb(36, 156, 139)
+                                        }
+                                        SlotMonitorState::AuthRequired => {
+                                            egui::Color32::from_rgb(118, 92, 186)
+                                        }
+                                        SlotMonitorState::WebOnline => {
+                                            egui::Color32::from_rgb(47, 105, 121)
+                                        }
+                                        SlotMonitorState::SshOnly => {
+                                            egui::Color32::from_rgb(67, 77, 91)
+                                        }
+                                        SlotMonitorState::Offline => {
+                                            egui::Color32::from_rgb(105, 39, 49)
+                                        }
+                                        SlotMonitorState::Unknown => color_surface_high(),
+                                    }
+                                };
+                                let text_color = if monitor_state == SlotMonitorState::Unknown
+                                    && assignment.is_none()
+                                    && !selected
+                                {
+                                    color_text_muted()
+                                } else {
+                                    color_text()
+                                };
+                                let stroke = if selected {
+                                    egui::Stroke::new(2.0, color_text())
+                                } else {
+                                    egui::Stroke::new(1.0, fill.linear_multiply(1.12))
+                                };
+                                let response = slot_cell(
+                                    ui,
+                                    &slot.to_string(),
+                                    egui::vec2(slot_width, 21.0),
+                                    fill,
+                                    text_color,
+                                    stroke,
+                                );
 
-                    ui.checkbox(&mut self.auto_apply_armed_reports, "Auto apply armed reports");
+                                let mut tip = format!(
+                                    "Rack {} / Slot {}\nTarget IP  {}\nStatus  {}",
+                                    rack,
+                                    slot,
+                                    target_ip,
+                                    monitor_state.label()
+                                );
+                                if let Some(row) = assignment {
+                                    tip.push_str(&format!(
+                                        "\nCurrent IP  {}\nMAC  {}\nCapture  {}\nApply  {}",
+                                        row.current_ip, row.mac, row.status, row.apply_status
+                                    ));
+                                }
+                                let was_clicked = response.clicked();
+                                response.on_hover_text(tip);
+                                if was_clicked {
+                                    clicked_slot = Some(slot);
+                                }
+                            }
+                            ui.end_row();
+                        }
+                    });
+            });
 
-                    ui.label(egui::RichText::new("Live interval").color(egui::Color32::from_rgb(205, 215, 245)));
-                    ui.add(egui::DragValue::new(&mut self.monitor_interval_secs).clamp_range(5..=600).speed(1));
+        clicked_slot
+    }
 
+    fn render_rack_map(&mut self, ui: &mut egui::Ui) {
+        let mut clicked_slot: Option<(usize, usize)> = None;
+
+        let scroll_height = ui.available_height().max(320.0);
+        egui::ScrollArea::vertical()
+            .id_source("rack_map_scroll")
+            .max_height(scroll_height)
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                for rack_pair_start in (1..=self.rack_count).step_by(2) {
+                    ui.columns(2, |columns| {
+                        if let Some(slot) = self.render_rack_panel(&mut columns[0], rack_pair_start)
+                        {
+                            clicked_slot = Some((rack_pair_start, slot));
+                        }
+                        let second_rack = rack_pair_start + 1;
+                        if second_rack <= self.rack_count {
+                            if let Some(slot) = self.render_rack_panel(&mut columns[1], second_rack)
+                            {
+                                clicked_slot = Some((second_rack, slot));
+                            }
+                        }
+                    });
+                    ui.add_space(8.0);
+                }
+            });
+
+        if let Some((rack, slot)) = clicked_slot {
+            if self.edit_rack_map {
+                self.arm_rack_slot(rack, slot);
+            } else {
+                self.select_rack_slot_details(rack, slot);
+            }
+        }
+    }
+
+    fn render_dashboard_toolbar(&mut self, ui: &mut egui::Ui) {
+        egui::Frame::none()
+            .fill(color_surface())
+            .stroke(egui::Stroke::new(1.0, color_border()))
+            .rounding(egui::Rounding::same(7.0))
+            .inner_margin(egui::Margin::symmetric(10.0, 8.0))
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
                     if ui
-                        .add_enabled(!self.monitor_running, egui::Button::new("Rescan All"))
+                        .add_enabled(
+                            !self.monitor_running,
+                            egui::Button::new("↻  Scan all")
+                                .fill(color_accent())
+                                .stroke(egui::Stroke::NONE),
+                        )
                         .clicked()
                     {
                         self.start_monitor_scan(false, None);
                     }
 
-                    ui.label(
-                        egui::RichText::new("Rack").color(egui::Color32::from_rgb(205, 215, 245)),
-                    );
+                    ui.separator();
+                    toolbar_label(ui, "RACK");
                     let rack_input = ui.add_sized(
-                        [44.0, 24.0],
+                        [44.0, 32.0],
                         egui::TextEdit::singleline(&mut self.monitor_rack_input)
                             .char_limit(2)
                             .hint_text("1-19"),
                     );
                     let scan_rack_clicked = ui
-                        .add_enabled(!self.monitor_running, egui::Button::new("Scan Rack"))
+                        .add_enabled(!self.monitor_running, egui::Button::new("Scan rack"))
                         .clicked();
                     let scan_rack_entered = !self.monitor_running
                         && rack_input.lost_focus()
@@ -3189,6 +3487,15 @@ impl BlockOpsApp {
                         }
                     }
 
+                    ui.separator();
+                    toolbar_label(ui, "LIVE");
+                    ui.add(
+                        egui::DragValue::new(&mut self.monitor_interval_secs)
+                            .clamp_range(5..=600)
+                            .suffix(" sec")
+                            .speed(1),
+                    );
+
                     if self.monitor_live {
                         let stopping = self
                             .monitor_stop
@@ -3200,168 +3507,728 @@ impl BlockOpsApp {
                                 egui::Button::new(if stopping {
                                     "Stopping..."
                                 } else {
-                                    "Stop Live"
-                                }),
+                                    "■  Stop live"
+                                })
+                                .fill(color_danger())
+                                .stroke(egui::Stroke::NONE),
                             )
                             .clicked()
                         {
                             self.stop_monitor_scan();
                         }
                     } else if ui
-                        .add_enabled(!self.monitor_running, egui::Button::new("Start Live"))
+                        .add_enabled(
+                            !self.monitor_running,
+                            egui::Button::new("▶  Start live")
+                                .fill(color_success())
+                                .stroke(egui::Stroke::NONE),
+                        )
                         .clicked()
                     {
                         self.start_monitor_scan(true, None);
                     }
+
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if mode_button(ui, "✎  Assign IP", self.edit_rack_map, color_warning())
+                            .clicked()
+                        {
+                            self.edit_rack_map = true;
+                        }
+                        if mode_button(ui, "⌖  Inspect", !self.edit_rack_map, color_accent())
+                            .clicked()
+                        {
+                            self.edit_rack_map = false;
+                            self.armed_target_ip = None;
+                        }
+                        toolbar_label(ui, "MODE");
+                    });
                 });
 
-                let counts = self.monitor_counts();
-                ui.add_space(6.0);
-                ui.horizontal_wrapped(|ui| {
-                    count_chip(ui, "Present", counts.present, counts.total, egui::Color32::from_rgb(75, 151, 116));
-                    count_chip(ui, "VNISH", counts.vnish, counts.total, egui::Color32::from_rgb(57, 142, 214));
-                    count_chip(ui, "Bitmain", counts.bitmain, counts.total, egui::Color32::from_rgb(42, 166, 147));
-                    count_chip(ui, "Auth", counts.auth, counts.total, egui::Color32::from_rgb(126, 101, 211));
-                    count_chip(ui, "Web", counts.web, counts.total, egui::Color32::from_rgb(84, 96, 148));
-                    count_chip(ui, "SSH", counts.ssh, counts.total, egui::Color32::from_rgb(102, 118, 138));
-                    count_chip(ui, "Offline", counts.offline, counts.total, egui::Color32::from_rgb(142, 52, 65));
-                    count_chip(ui, "Unknown", counts.unknown, counts.total, egui::Color32::from_rgb(75, 80, 108));
-                });
+                if self.edit_rack_map {
+                    ui.add_space(8.0);
+                    egui::Frame::none()
+                        .fill(egui::Color32::from_rgb(49, 38, 20))
+                        .stroke(egui::Stroke::new(
+                            1.0,
+                            color_warning().linear_multiply(0.55),
+                        ))
+                        .rounding(egui::Rounding::same(5.0))
+                        .inner_margin(egui::Margin::symmetric(9.0, 6.0))
+                        .show(ui, |ui| {
+                            ui.horizontal(|ui| {
+                                let listener_label = if self.listener_started {
+                                    "■  Stop listener"
+                                } else {
+                                    "▶  Start listener"
+                                };
+                                if ui
+                                    .add(egui::Button::new(listener_label).fill(
+                                        if self.listener_started {
+                                            color_success()
+                                        } else {
+                                            color_surface_high()
+                                        },
+                                    ))
+                                    .clicked()
+                                {
+                                    self.toggle_listener();
+                                }
+                                ui.checkbox(
+                                    &mut self.auto_apply_armed_reports,
+                                    "Apply immediately",
+                                );
 
-                ui.add_space(6.0);
+                                ui.separator();
+                                if let (Some((rack, slot)), Some(target)) =
+                                    (self.selected_rack_slot, self.armed_target_ip.as_ref())
+                                {
+                                    ui.strong(
+                                        egui::RichText::new(format!(
+                                            "ARMED TARGET   R{:02} / S{:03}   {}",
+                                            rack, slot, target
+                                        ))
+                                        .color(color_warning()),
+                                    );
+                                    if ui.button("Clear").clicked() {
+                                        self.armed_target_ip = None;
+                                        self.status = "Armed rack target cancelled.".to_string();
+                                    }
+                                } else {
+                                    ui.label(
+                                egui::RichText::new(
+                                    "Select a slot, then press IP Report on that physical miner.",
+                                )
+                                .color(color_warning()),
+                            );
+                                }
+                            })
+                        });
+                }
+            });
+    }
 
-                ui.horizontal(|ui| {
-                    if self.edit_rack_map {
-                        ui.label(egui::RichText::new("Edit mode is ON. Clicking a square arms it for the next IP Report.").color(egui::Color32::from_rgb(255, 212, 92)).strong());
-                    } else {
-                        ui.label(egui::RichText::new("Dashboard mode. Clicking a square shows miner details.").color(egui::Color32::from_rgb(205, 215, 245)));
-                    }
+    fn render_rack_dashboard(&mut self, ui: &mut egui::Ui) {
+        self.render_dashboard_toolbar(ui);
+        ui.add_space(8.0);
+        self.render_rack_map(ui);
+    }
 
-                    if let Some((rack, slot)) = self.selected_rack_slot {
-                        let target = self.armed_target_ip.clone()
-                            .or_else(|| self.rack_slot_target_ip(rack, slot))
-                            .unwrap_or_else(|| "invalid".to_string());
-                        ui.separator();
-                        ui.label(egui::RichText::new(format!("Selected Rack {} Slot {} -> {}", rack, slot, target)).color(egui::Color32::from_rgb(255, 212, 92)).strong());
-                    }
+    fn render_capture_session(&mut self, ui: &mut egui::Ui) {
+        section_label(ui, "CAPTURE SESSION");
+        ui.add_space(5.0);
+        ui.horizontal(|ui| {
+            status_dot(
+                ui,
+                if self.listener_started {
+                    color_success()
+                } else {
+                    color_text_muted()
+                },
+            );
+            ui.label(if self.listener_started {
+                "IP Report listener active"
+            } else {
+                "IP Report listener stopped"
+            });
+            let listener_label = if self.listener_started {
+                "Stop"
+            } else {
+                "Start"
+            };
+            if ui.button(listener_label).clicked() {
+                self.toggle_listener();
+            }
+        });
+        ui.horizontal(|ui| {
+            toolbar_label(ui, "FIRST TARGET");
+            let start_input = ui.add_sized(
+                [126.0, 32.0],
+                egui::TextEdit::singleline(&mut self.start_ip_input).hint_text("10.4.1.1"),
+            );
+            let set_clicked = ui.button("Set").clicked();
+            let set_entered =
+                start_input.lost_focus() && ui.input(|input| input.key_pressed(egui::Key::Enter));
+            if set_clicked || set_entered {
+                self.set_start_ip();
+            }
+        });
+    }
 
-                    if self.armed_target_ip.is_some() && ui.button("Cancel Armed Target").clicked() {
-                        self.armed_target_ip = None;
-                        self.status = "Armed rack target cancelled.".to_string();
-                    }
-                });
+    fn render_assignment_cursor(&self, ui: &mut egui::Ui, pending_count: usize) {
+        section_label(ui, "ASSIGNMENT CURSOR");
+        ui.add_space(4.0);
+        ui.label(
+            egui::RichText::new(
+                self.next_target_ip
+                    .map(|ip| ip.to_string())
+                    .unwrap_or_else(|| "Not set".to_string()),
+            )
+            .size(20.0)
+            .strong()
+            .color(if self.next_target_ip.is_some() {
+                color_text()
+            } else {
+                color_text_muted()
+            }),
+        );
+        ui.label(
+            egui::RichText::new(format!(
+                "{} captured  /  {} ready to apply",
+                self.rows.len(),
+                pending_count
+            ))
+            .small()
+            .color(color_text_muted()),
+        );
+    }
 
-                self.render_selected_slot_details(ui);
+    fn render_deployment(
+        &mut self,
+        ui: &mut egui::Ui,
+        pending_count: usize,
+        has_pending_changes: bool,
+    ) {
+        section_label(ui, "DEPLOYMENT");
+        ui.add_space(5.0);
+        let apply_label = if self.apply_running {
+            if self.apply_queued {
+                "Applying  /  batch queued"
+            } else {
+                "Applying changes"
+            }
+        } else {
+            "✓  Apply safe order"
+        };
+        if ui
+            .add_enabled(
+                has_pending_changes && !self.apply_running,
+                egui::Button::new(apply_label)
+                    .fill(color_success())
+                    .stroke(egui::Stroke::NONE)
+                    .min_size(egui::vec2(170.0, 36.0)),
+            )
+            .clicked()
+        {
+            self.apply_safe_order();
+        }
+        ui.label(
+            egui::RichText::new(format!(
+                "{} pending  /  {} failed",
+                pending_count,
+                self.failed_count()
+            ))
+            .small()
+            .color(if self.failed_count() > 0 {
+                color_danger()
+            } else {
+                color_text_muted()
+            }),
+        );
+    }
+
+    fn render_assignment_controls(&mut self, ui: &mut egui::Ui) {
+        let has_selection = self.selected_line.is_some();
+        let pending_count = self
+            .rows
+            .iter()
+            .filter(|row| {
+                valid_ip(&row.current_ip)
+                    && valid_ip(&row.target_ip)
+                    && row.current_ip != row.target_ip
+            })
+            .count();
+        let has_pending_changes = pending_count > 0;
+
+        egui::Frame::none()
+            .fill(color_surface())
+            .stroke(egui::Stroke::new(1.0, color_border()))
+            .rounding(egui::Rounding::same(7.0))
+            .inner_margin(egui::Margin::same(12.0))
+            .show(ui, |ui| {
+                if ui.available_width() < 920.0 {
+                    self.render_capture_session(ui);
+                    ui.add_space(8.0);
+                    ui.separator();
+                    ui.add_space(8.0);
+                    ui.columns(2, |columns| {
+                        self.render_assignment_cursor(&mut columns[0], pending_count);
+                        self.render_deployment(&mut columns[1], pending_count, has_pending_changes);
+                    });
+                } else {
+                    ui.columns(3, |columns| {
+                        self.render_capture_session(&mut columns[0]);
+                        self.render_assignment_cursor(&mut columns[1], pending_count);
+                        self.render_deployment(&mut columns[2], pending_count, has_pending_changes);
+                    });
+                }
 
                 ui.add_space(8.0);
+                ui.separator();
+                ui.add_space(2.0);
+                ui.horizontal_wrapped(|ui| {
+                    toolbar_label(ui, "SKIP REASON");
+                    ui.add_sized(
+                        [116.0, 32.0],
+                        egui::TextEdit::singleline(&mut self.skip_reason_input),
+                    );
+                    if ui
+                        .add_enabled(
+                            self.next_target_ip.is_some() && !self.apply_running,
+                            egui::Button::new("Skip Next"),
+                        )
+                        .clicked()
+                    {
+                        self.skip_next_target();
+                    }
 
-                egui::ScrollArea::vertical()
-                    .id_source("rack_map_scroll")
-                    .max_height(560.0)
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        ui.vertical(|ui| {
-                            for rack_pair_start in (1..=self.rack_count).step_by(2) {
-                                ui.horizontal_top(|ui| {
-                                    for rack in rack_pair_start..=self.rack_count.min(rack_pair_start + 1) {
-                                        egui::Frame::none()
-                                            .fill(egui::Color32::from_rgb(36, 39, 62))
-                                            .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(70, 76, 108)))
-                                            .rounding(egui::Rounding::same(6.0))
-                                            .inner_margin(egui::Margin::same(6.0))
-                                            .show(ui, |ui| {
-                                                let online_count = (1..=self.rack_size)
-                                                    .filter_map(|slot| self.rack_slot_target_ip(rack, slot))
-                                                    .filter(|ip| {
-                                                        self.monitor_results
-                                                            .get(ip)
-                                                            .copied()
-                                                            .unwrap_or(SlotMonitorState::Unknown)
-                                                            .is_present()
-                                                    })
-                                                    .count();
+                    ui.separator();
+                    if let Some(line) = self.selected_line {
+                        status_badge(ui, &format!("Line {} selected", line), color_accent());
+                    } else {
+                        toolbar_label(ui, "NO ROW SELECTED");
+                    }
 
-                                                ui.horizontal(|ui| {
-                                                    ui.strong(egui::RichText::new(format!("Rack {}", rack)).color(egui::Color32::WHITE));
-                                                    ui.label(egui::RichText::new(format!("{}/{}", online_count, self.rack_size)).color(egui::Color32::from_rgb(180, 190, 220)));
-                                                });
+                    if ui
+                        .add_enabled(
+                            has_selection && !self.apply_running,
+                            egui::Button::new("Redo selected"),
+                        )
+                        .clicked()
+                    {
+                        self.arm_selected_row_for_redo();
+                    }
+                    if ui
+                        .add_enabled(
+                            self.redo_target_ip.is_some() && !self.apply_running,
+                            egui::Button::new("Cancel redo"),
+                        )
+                        .clicked()
+                    {
+                        self.cancel_redo();
+                    }
+                    if ui
+                        .add_enabled(
+                            has_selection && !self.apply_running,
+                            egui::Button::new("Delete row"),
+                        )
+                        .clicked()
+                    {
+                        self.delete_selected_entry();
+                    }
+                    if ui
+                        .add_enabled(
+                            !self.rows.is_empty() && !self.apply_running,
+                            egui::Button::new("Undo last"),
+                        )
+                        .clicked()
+                    {
+                        self.undo_last_entry();
+                    }
+                    ui.separator();
+                    if ui
+                        .add_enabled(
+                            has_pending_changes && !self.apply_running,
+                            egui::Button::new("Pre-check"),
+                        )
+                        .clicked()
+                    {
+                        self.run_prechecks();
+                    }
+                    ui.menu_button("Export  ▾", |ui| {
+                        if ui
+                            .add_enabled(
+                                !self.rows.is_empty(),
+                                egui::Button::new("Assignment plan"),
+                            )
+                            .clicked()
+                        {
+                            self.export_plan();
+                            ui.close_menu();
+                        }
+                        if ui
+                            .add_enabled(
+                                !self.apply_steps.is_empty(),
+                                egui::Button::new("Apply results"),
+                            )
+                            .clicked()
+                        {
+                            self.export_apply_results_csv();
+                            ui.close_menu();
+                        }
+                    });
+                });
 
-                                                egui::Grid::new(format!("rack_grid_{}", rack))
-                                                    .spacing(egui::vec2(2.0, 2.0))
-                                                    .show(ui, |ui| {
-                                                        for row in 0..rows_per_rack {
-                                                            for col in 0..cols {
-                                                                let slot = row * cols + col + 1;
-                                                                if slot > self.rack_size {
-                                                                    ui.add_space(22.0);
-                                                                    continue;
-                                                                }
+                if let (Some(line), Some(target)) =
+                    (self.redo_row_line, self.redo_target_ip.as_ref())
+                {
+                    ui.add_space(7.0);
+                    status_badge(
+                        ui,
+                        &format!("Redo armed  /  line {} keeps {}", line, target),
+                        color_warning(),
+                    );
+                }
+            });
+    }
 
-                                                                let target_ip = self.rack_slot_target_ip(rack, slot).unwrap_or_default();
-                                                                let assignment = self.slot_assignment(&target_ip);
-                                                                let selected = self.selected_rack_slot == Some((rack, slot));
-                                                                let monitor_state = self.monitor_results.get(&target_ip).copied().unwrap_or(SlotMonitorState::Unknown);
+    fn render_assignment_table(&mut self, ui: &mut egui::Ui, max_height: f32) {
+        egui::Frame::none()
+            .fill(color_surface())
+            .stroke(egui::Stroke::new(1.0, color_border()))
+            .rounding(egui::Rounding::same(7.0))
+            .inner_margin(egui::Margin::same(12.0))
+            .show(ui, |ui| {
+                ui.horizontal(|ui| {
+                    ui.vertical(|ui| {
+                        ui.label(
+                            egui::RichText::new("Assignment queue")
+                                .size(17.0)
+                                .strong()
+                                .color(color_text()),
+                        );
+                        ui.label(
+                            egui::RichText::new(format!(
+                                "{} miners  /  {} planned steps  /  {} failed",
+                                self.rows.len(),
+                                self.apply_steps.len(),
+                                self.failed_count()
+                            ))
+                            .small()
+                            .color(color_text_muted()),
+                        );
+                    });
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        ui.checkbox(&mut self.auto_scroll_miners, "Follow newest");
+                    });
+                });
+                ui.add_space(8.0);
 
-                                                                let fill = if selected {
-                                                                    egui::Color32::from_rgb(245, 177, 44)
-                                                                } else if let Some(row) = assignment {
-                                                                    if row.current_ip == row.target_ip {
-                                                                        egui::Color32::from_rgb(62, 166, 96)
-                                                                    } else if row.current_ip == "SKIPPED" {
-                                                                        egui::Color32::from_rgb(105, 109, 132)
-                                                                    } else {
-                                                                        egui::Color32::from_rgb(226, 171, 55)
-                                                                    }
-                                                                } else {
-                                                                    match monitor_state {
-                                                                        SlotMonitorState::VnishMiner => egui::Color32::from_rgb(57, 142, 214),
-                                                                        SlotMonitorState::BitmainMiner => egui::Color32::from_rgb(42, 166, 147),
-                                                                        SlotMonitorState::AuthRequired => egui::Color32::from_rgb(126, 101, 211),
-                                                                        SlotMonitorState::WebOnline => egui::Color32::from_rgb(84, 96, 148),
-                                                                        SlotMonitorState::SshOnly => egui::Color32::from_rgb(102, 118, 138),
-                                                                        SlotMonitorState::Offline => egui::Color32::from_rgb(142, 52, 65),
-                                                                        SlotMonitorState::Unknown => egui::Color32::from_rgb(75, 80, 108),
-                                                                    }
-                                                                };
+                if self.rows.is_empty() {
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(ui.available_width(), max_height.max(260.0)),
+                        egui::Layout::centered_and_justified(egui::Direction::TopDown),
+                        |ui| {
+                            empty_assignment_state(ui, self.listener_started);
+                        },
+                    );
+                    return;
+                }
 
-                                                                let response = ui.add_sized(
-                                                                    [22.0, 20.0],
-                                                                    egui::Button::new(egui::RichText::new(slot.to_string()).size(8.0).color(egui::Color32::WHITE))
-                                                                        .fill(fill)
-                                                                        .stroke(egui::Stroke::new(1.0, egui::Color32::from_rgb(93, 100, 137))),
-                                                                );
+                let row_count = self.rows.len();
+                let selected_line = self.selected_line;
+                let mut clicked_line = None;
+                let mut table = egui_extras::TableBuilder::new(ui)
+                    .striped(true)
+                    .resizable(true)
+                    .sense(egui::Sense::click())
+                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                    .min_scrolled_height(max_height.max(240.0))
+                    .max_scroll_height(max_height.max(240.0))
+                    .stick_to_bottom(self.auto_scroll_miners)
+                    .column(egui_extras::Column::exact(54.0))
+                    .column(egui_extras::Column::initial(132.0).at_least(112.0))
+                    .column(egui_extras::Column::initial(132.0).at_least(112.0))
+                    .column(egui_extras::Column::initial(165.0).at_least(128.0))
+                    .column(egui_extras::Column::remainder().at_least(115.0))
+                    .column(egui_extras::Column::remainder().at_least(115.0));
 
-                                                                let mut tip = format!("Rack {} Slot {}\nTarget IP: {}\nMonitor: {}", rack, slot, target_ip, monitor_state.label());
-                                                                if let Some(row) = assignment {
-                                                                    tip.push_str(&format!("\nCurrent IP: {}\nMAC: {}\nStatus: {}\nApply: {}", row.current_ip, row.mac, row.status, row.apply_status));
-                                                                }
-                                                                let was_clicked = response.clicked();
-                                                                response.on_hover_text(tip);
+                if self.auto_scroll_miners && self.scroll_to_bottom_next && row_count > 0 {
+                    table = table.scroll_to_row(row_count - 1, Some(egui::Align::BOTTOM));
+                    self.scroll_to_bottom_next = false;
+                }
 
-                                                                if was_clicked {
-                                                                    clicked_slot = Some((rack, slot));
-                                                                }
-                                                            }
-                                                            ui.end_row();
-                                                        }
-                                                    });
-                                            });
-                                        ui.add_space(8.0);
-                                    }
-                                });
-                                ui.add_space(6.0);
+                table
+                    .header(34.0, |mut header| {
+                        for heading in [
+                            "LINE",
+                            "CURRENT IP",
+                            "TARGET IP",
+                            "MAC ADDRESS",
+                            "CAPTURE",
+                            "APPLY",
+                        ] {
+                            header.col(|ui| table_heading(ui, heading));
+                        }
+                    })
+                    .body(|body| {
+                        body.rows(36.0, row_count, |mut table_row| {
+                            let row = &self.rows[table_row.index()];
+                            table_row.set_selected(selected_line == Some(row.line));
+                            table_row.col(|ui| {
+                                ui.label(
+                                    egui::RichText::new(format!("{:02}", row.line))
+                                        .strong()
+                                        .color(color_text_muted()),
+                                );
+                            });
+                            table_row.col(|ui| {
+                                ui.label(&row.current_ip);
+                            });
+                            table_row.col(|ui| {
+                                ui.label(
+                                    egui::RichText::new(&row.target_ip)
+                                        .strong()
+                                        .color(color_text()),
+                                );
+                            });
+                            table_row.col(|ui| {
+                                ui.label(
+                                    egui::RichText::new(&row.mac)
+                                        .family(egui::FontFamily::Monospace)
+                                        .size(12.0),
+                                );
+                            });
+                            table_row.col(|ui| table_status(ui, &row.status));
+                            table_row.col(|ui| table_status(ui, &row.apply_status));
+                            if table_row.response().clicked() {
+                                clicked_line = Some(row.line);
                             }
                         });
                     });
-            });
 
-        if let Some((rack, slot)) = clicked_slot {
-            if self.edit_rack_map {
-                self.arm_rack_slot(rack, slot);
-            } else {
-                self.select_rack_slot_details(rack, slot);
-            }
-        }
+                if let Some(line) = clicked_line {
+                    self.select_assignment_row(line);
+                }
+            });
+    }
+
+    fn render_ip_assignment(&mut self, ui: &mut egui::Ui) {
+        self.render_assignment_controls(ui);
+        ui.add_space(8.0);
+        self.render_assignment_table(ui, ui.available_height().max(320.0) - 72.0);
+    }
+
+    fn render_settings(&mut self, ui: &mut egui::Ui) {
+        egui::ScrollArea::vertical()
+            .id_source("settings_scroll")
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new("Site settings")
+                        .size(17.0)
+                        .strong()
+                        .color(color_text()),
+                );
+                ui.label(
+                    egui::RichText::new("Rack layout, network behavior, and miner access defaults")
+                        .small()
+                        .color(color_text_muted()),
+                );
+                ui.add_space(10.0);
+
+                egui::Frame::none()
+                    .fill(color_surface())
+                    .stroke(egui::Stroke::new(1.0, color_border()))
+                    .rounding(egui::Rounding::same(7.0))
+                    .inner_margin(egui::Margin::symmetric(12.0, 9.0))
+                    .show(ui, |ui| {
+                        ui.columns(3, |columns| {
+                            settings_summary(
+                                &mut columns[0],
+                                "ADDRESS SPACE",
+                                &format!("10.4.1-{}  /  {} slots", self.rack_count, self.rack_size),
+                            );
+                            settings_summary(
+                                &mut columns[1],
+                                "SCAN WORKERS",
+                                &self.parallel_jobs.to_string(),
+                            );
+                            settings_summary(
+                                &mut columns[2],
+                                "IP REPORT PORT",
+                                &self.listen_port.to_string(),
+                            );
+                        });
+                    });
+                ui.add_space(10.0);
+
+                let section_stroke = egui::Stroke::new(1.0, color_border());
+                ui.columns(2, |columns| {
+                    egui::Frame::none()
+                        .fill(color_surface())
+                        .stroke(section_stroke)
+                        .rounding(egui::Rounding::same(7.0))
+                        .inner_margin(egui::Margin::same(14.0))
+                        .show(&mut columns[0], |ui| {
+                            settings_header(
+                                ui,
+                                "Rack layout",
+                                "Maps each physical slot to its expected address",
+                            );
+                            ui.add_space(10.0);
+                            egui::Grid::new("rack_layout_settings")
+                                .num_columns(2)
+                                .spacing(egui::vec2(16.0, 8.0))
+                                .show(ui, |ui| {
+                                    ui.label("Rack 1, Slot 1 IP");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.rack_one_slot_one_ip)
+                                            .desired_width(150.0),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Rack count");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.rack_count)
+                                            .clamp_range(1..=40),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Slots per rack");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.rack_size)
+                                            .clamp_range(1..=168),
+                                    );
+                                    ui.end_row();
+                                });
+                        });
+
+                    columns[0].add_space(8.0);
+                    egui::Frame::none()
+                        .fill(color_surface())
+                        .stroke(section_stroke)
+                        .rounding(egui::Rounding::same(7.0))
+                        .inner_margin(egui::Margin::same(14.0))
+                        .show(&mut columns[0], |ui| {
+                            settings_header(
+                                ui,
+                                "Monitoring and performance",
+                                "Controls scan cadence, concurrency, and apply timing",
+                            );
+                            ui.add_space(10.0);
+                            egui::Grid::new("performance_settings")
+                                .num_columns(2)
+                                .spacing(egui::vec2(16.0, 8.0))
+                                .show(ui, |ui| {
+                                    ui.label("Live interval");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.monitor_interval_secs)
+                                            .clamp_range(5..=600)
+                                            .suffix(" sec"),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Parallel jobs");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.parallel_jobs)
+                                            .clamp_range(1..=64),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Apply timeout");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.timeout_secs)
+                                            .clamp_range(3..=120)
+                                            .suffix(" sec"),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Wave delay");
+                                    ui.add(
+                                        egui::DragValue::new(&mut self.apply_delay_secs)
+                                            .clamp_range(0..=60)
+                                            .suffix(" sec"),
+                                    );
+                                    ui.end_row();
+                                });
+                        });
+
+                    egui::Frame::none()
+                        .fill(color_surface())
+                        .stroke(section_stroke)
+                        .rounding(egui::Rounding::same(7.0))
+                        .inner_margin(egui::Margin::same(14.0))
+                        .show(&mut columns[1], |ui| {
+                            settings_header(
+                                ui,
+                                "IP Report and safety",
+                                "Listener and wrong-subnet protection",
+                            );
+                            ui.add_space(10.0);
+                            ui.horizontal(|ui| {
+                                ui.label("UDP listener port");
+                                ui.add(egui::DragValue::new(&mut self.listen_port).speed(1));
+                            });
+                            ui.checkbox(
+                                &mut self.reject_wrong_subnet_reports,
+                                "Reject reports from the wrong subnet",
+                            );
+                        });
+
+                    columns[1].add_space(8.0);
+                    egui::Frame::none()
+                        .fill(color_surface())
+                        .stroke(section_stroke)
+                        .rounding(egui::Rounding::same(7.0))
+                        .inner_margin(egui::Margin::same(14.0))
+                        .show(&mut columns[1], |ui| {
+                            settings_header(
+                                ui,
+                                "Miner authentication",
+                                "Credentials used for VNISH and stock Bitmain APIs",
+                            );
+                            ui.add_space(10.0);
+                            egui::Grid::new("auth_settings")
+                                .num_columns(2)
+                                .spacing(egui::vec2(16.0, 8.0))
+                                .show(ui, |ui| {
+                                    ui.label("VNISH password");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.vnish_password)
+                                            .password(true)
+                                            .desired_width(160.0),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Bitmain username");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.stock_user)
+                                            .desired_width(160.0),
+                                    );
+                                    ui.end_row();
+                                    ui.label("Bitmain password");
+                                    ui.add(
+                                        egui::TextEdit::singleline(&mut self.stock_password)
+                                            .password(true)
+                                            .desired_width(160.0),
+                                    );
+                                    ui.end_row();
+                                });
+                        });
+
+                    columns[1].add_space(8.0);
+                    egui::Frame::none()
+                        .fill(color_surface())
+                        .stroke(section_stroke)
+                        .rounding(egui::Rounding::same(7.0))
+                        .inner_margin(egui::Margin::same(14.0))
+                        .show(&mut columns[1], |ui| {
+                            settings_header(
+                                ui,
+                                "Static network values",
+                                "Defaults written during IP assignment",
+                            );
+                            ui.add_space(10.0);
+                            egui::Grid::new("network_settings")
+                                .num_columns(2)
+                                .spacing(egui::vec2(16.0, 8.0))
+                                .show(ui, |ui| {
+                                    for (label, value, hint) in [
+                                        ("Netmask", &mut self.netmask, "255.255.255.0"),
+                                        (
+                                            "Gateway",
+                                            &mut self.gateway_override,
+                                            "blank = auto .254",
+                                        ),
+                                        ("DNS 1", &mut self.dns1, "1.1.1.1"),
+                                        ("DNS 2", &mut self.dns2, "8.8.8.8"),
+                                    ] {
+                                        ui.label(label);
+                                        ui.add(
+                                            egui::TextEdit::singleline(value)
+                                                .hint_text(hint)
+                                                .desired_width(170.0),
+                                        );
+                                        ui.end_row();
+                                    }
+                                });
+                        });
+                });
+            });
     }
 }
 
@@ -3376,26 +4243,57 @@ impl App for BlockOpsApp {
             return;
         }
 
+        ctx.request_repaint_after(Duration::from_millis(200));
         self.poll_channels();
 
         if let Some(popup) = self.wrong_subnet_popup.clone() {
-            egui::Window::new("Wrong subnet IP Report blocked")
+            egui::Window::new("IP Report blocked")
                 .collapsible(false)
                 .resizable(false)
+                .default_width(390.0)
                 .show(ctx, |ui| {
-                    ui.label("This IP Report was NOT accepted.");
+                    ui.set_min_width(370.0);
+                    status_badge(ui, "WRONG SUBNET", color_danger());
+                    ui.add_space(8.0);
+                    ui.label(
+                        egui::RichText::new(
+                            "The reported miner is outside the armed target subnet",
+                        )
+                        .size(16.0)
+                        .strong()
+                        .color(color_text()),
+                    );
+                    ui.add_space(8.0);
                     ui.separator();
-                    ui.label(format!("Reported current IP: {}", popup.reported_ip));
-                    ui.label(format!("Reported MAC: {}", popup.mac));
-                    ui.label(format!("Next target IP: {}", popup.target_ip));
-                    ui.label(format!("Expected subnet: {}.x", popup.expected_subnet));
-                    ui.label(format!("Reported subnet: {}.x", popup.reported_subnet));
+                    ui.add_space(6.0);
+                    egui::Grid::new("wrong_subnet_details")
+                        .num_columns(2)
+                        .spacing(egui::vec2(22.0, 7.0))
+                        .show(ui, |ui| {
+                            detail_row(ui, "Reported IP", &popup.reported_ip);
+                            detail_row(ui, "Reported MAC", &popup.mac);
+                            detail_row(ui, "Armed target", &popup.target_ip);
+                            detail_row(
+                                ui,
+                                "Expected subnet",
+                                &format!("{}.x", popup.expected_subnet),
+                            );
+                            detail_row(
+                                ui,
+                                "Reported subnet",
+                                &format!("{}.x", popup.reported_subnet),
+                            );
+                        });
+                    ui.add_space(8.0);
                     ui.separator();
-                    ui.label("Reset that miner to DHCP / correct subnet, rescan, then press IP Report again.");
-                    ui.horizontal(|ui| {
-                        if ui.button("Reset and rescan").clicked() {
-                            self.wrong_subnet_popup = None;
-                        }
+                    ui.add_space(6.0);
+                    ui.label(
+                        egui::RichText::new(
+                            "Correct the miner network, rescan it, then send IP Report again.",
+                        )
+                        .color(color_warning()),
+                    );
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                         if ui.button("Dismiss").clicked() {
                             self.wrong_subnet_popup = None;
                         }
@@ -3403,405 +4301,620 @@ impl App for BlockOpsApp {
                 });
         }
 
-        self.render_miner_detail_popup(ctx);
+        if self.active_view == AppView::RackDashboard {
+            self.render_miner_detail_popup(ctx);
+        }
 
-        egui::TopBottomPanel::top("brand_header")
+        let fleet_counts =
+            (self.active_view == AppView::RackDashboard).then(|| self.monitor_counts());
+
+        egui::SidePanel::left("app_sidebar")
+            .exact_width(204.0)
+            .resizable(false)
             .frame(
                 egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(8, 20, 70))
-                    .inner_margin(egui::Margin::same(10.0)),
+                    .fill(color_sidebar())
+                    .stroke(egui::Stroke::new(1.0, color_border()))
+                    .inner_margin(egui::Margin::same(14.0)),
+            )
+            .show(ctx, |ui| {
+                ui.vertical(|ui| {
+                    ui.horizontal(|ui| {
+                        brand_mark(ui, 38.0);
+                        ui.vertical(|ui| {
+                            ui.label(
+                                egui::RichText::new("BlockOps")
+                                    .size(17.0)
+                                    .strong()
+                                    .color(color_text()),
+                            );
+                            ui.label(
+                                egui::RichText::new("STATIC IP MANAGER")
+                                    .size(10.0)
+                                    .strong()
+                                    .color(color_text_muted()),
+                            );
+                        });
+                    });
+                    ui.add_space(22.0);
+                    section_label(ui, "WORKSPACE");
+                    ui.add_space(6.0);
+
+                    for (view, icon, label) in [
+                        (AppView::RackDashboard, "▦", "Rack dashboard"),
+                        (AppView::IpAssignment, "↔", "IP assignment"),
+                        (AppView::Settings, "⚙", "Settings"),
+                    ] {
+                        let selected = self.active_view == view;
+                        if nav_button(ui, icon, label, selected).clicked() {
+                            self.active_view = view;
+                        }
+                    }
+
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Min), |ui| {
+                        ui.label(
+                            egui::RichText::new("VERSION 2.1.1")
+                                .size(10.0)
+                                .color(color_text_muted()),
+                        );
+                        ui.add_space(8.0);
+                        egui::Frame::none()
+                            .fill(color_surface())
+                            .stroke(egui::Stroke::new(1.0, color_border()))
+                            .rounding(egui::Rounding::same(7.0))
+                            .inner_margin(egui::Margin::same(10.0))
+                            .show(ui, |ui| {
+                                ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| {
+                                    ui.set_min_width(ui.available_width());
+                                    section_label(ui, "SITE STATUS");
+                                    ui.add_space(6.0);
+                                    ui.horizontal(|ui| {
+                                        status_dot(
+                                            ui,
+                                            if self.listener_started {
+                                                color_success()
+                                            } else {
+                                                color_text_muted()
+                                            },
+                                        );
+                                        ui.label(if self.listener_started {
+                                            "IP Report listening"
+                                        } else {
+                                            "IP Report stopped"
+                                        });
+                                    });
+                                    ui.add_space(5.0);
+                                    sidebar_stat(
+                                        ui,
+                                        "Assignment queue",
+                                        &self.rows.len().to_string(),
+                                    );
+                                    sidebar_stat(
+                                        ui,
+                                        "Planned steps",
+                                        &self.apply_steps.len().to_string(),
+                                    );
+                                    ui.add_space(5.0);
+                                    ui.label(
+                                        egui::RichText::new(format!(
+                                            "10.4.1-{}  /  {} slots per rack",
+                                            self.rack_count, self.rack_size
+                                        ))
+                                        .size(10.5)
+                                        .color(color_text_muted()),
+                                    );
+                                });
+                            });
+                    });
+                });
+            });
+
+        egui::TopBottomPanel::top("workspace_header")
+            .exact_height(64.0)
+            .frame(
+                egui::Frame::none()
+                    .fill(color_sidebar())
+                    .stroke(egui::Stroke::new(1.0, color_border()))
+                    .inner_margin(egui::Margin::symmetric(16.0, 9.0)),
             )
             .show(ctx, |ui| {
                 ui.horizontal_centered(|ui| {
-                    if let Some(logo) = &self.header_logo {
-                        logo.show_size(ui, egui::vec2(300.0, 60.0));
-                    } else {
-                        ui.heading(
-                            egui::RichText::new("BlockOps Mining").color(egui::Color32::WHITE),
-                        );
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(210.0, ui.available_height()),
+                        egui::Layout::top_down(egui::Align::Min),
+                        |ui| {
+                            ui.label(
+                                egui::RichText::new(self.active_view.label())
+                                    .size(19.0)
+                                    .strong()
+                                    .color(color_text()),
+                            );
+                            let subtitle = match self.active_view {
+                                AppView::RackDashboard => format!(
+                                    "{} racks  /  {} managed slots",
+                                    self.rack_count,
+                                    self.rack_count.saturating_mul(self.rack_size)
+                                ),
+                                AppView::IpAssignment => format!(
+                                    "{} captured miners  /  next target {}",
+                                    self.rows.len(),
+                                    self.next_target_ip
+                                        .map(|ip| ip.to_string())
+                                        .unwrap_or_else(|| "not set".to_string())
+                                ),
+                                AppView::Settings => {
+                                    "Site layout, credentials, and network behavior".to_string()
+                                }
+                            };
+                            ui.label(
+                                egui::RichText::new(subtitle)
+                                    .small()
+                                    .color(color_text_muted()),
+                            );
+                        },
+                    );
+
+                    if let Some(counts) = fleet_counts.as_ref() {
+                        let status_reserve = if self.listener_started { 220.0 } else { 132.0 };
+                        let metrics_width = (ui.available_width() - status_reserve).max(0.0);
+                        if metrics_width >= 540.0 {
+                            let other_online = counts.auth + counts.web + counts.ssh;
+                            ui.allocate_ui_with_layout(
+                                egui::vec2(metrics_width, ui.available_height()),
+                                egui::Layout::left_to_right(egui::Align::Center),
+                                |ui| {
+                                    ui.columns(6, |columns| {
+                                        header_metric(
+                                            &mut columns[0],
+                                            "ONLINE",
+                                            counts.present,
+                                            color_success(),
+                                        );
+                                        header_metric(
+                                            &mut columns[1],
+                                            "VNISH",
+                                            counts.vnish,
+                                            color_accent(),
+                                        );
+                                        header_metric(
+                                            &mut columns[2],
+                                            "BITMAIN",
+                                            counts.bitmain,
+                                            egui::Color32::from_rgb(43, 177, 157),
+                                        );
+                                        header_metric(
+                                            &mut columns[3],
+                                            "OTHER",
+                                            other_online,
+                                            egui::Color32::from_rgb(93, 139, 158),
+                                        );
+                                        header_metric(
+                                            &mut columns[4],
+                                            "OFFLINE",
+                                            counts.offline,
+                                            color_danger(),
+                                        );
+                                        header_metric(
+                                            &mut columns[5],
+                                            "UNSCANNED",
+                                            counts.unknown,
+                                            color_text_muted(),
+                                        );
+                                    });
+                                },
+                            );
+                        }
                     }
 
-                    ui.add_space(12.0);
-                    ui.separator();
-                    ui.add_space(12.0);
-
-                    ui.vertical(|ui| {
-                        ui.label(
-                            egui::RichText::new("Multi-Firmware Static IP Tool")
-                                .size(24.0)
-                                .strong()
-                                .color(egui::Color32::WHITE),
-                        );
-                        ui.label(
-                            egui::RichText::new(
-                                "VNISH + Bitmain/Hiveon support with safe rack assignment",
-                            )
-                            .color(egui::Color32::from_rgb(205, 215, 245)),
-                        );
-                    });
-
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        let listener_label = if self.listener_started {
-                            "Stop Listening"
+                        let (activity, activity_color) = if self.apply_running {
+                            ("APPLYING CHANGES", color_warning())
+                        } else if self.monitor_live {
+                            ("LIVE MONITORING", color_success())
+                        } else if self.monitor_running {
+                            ("SCANNING NETWORK", color_accent())
                         } else {
-                            "Start Listening"
+                            ("SYSTEM READY", color_success())
                         };
-                        if ui
-                            .add_sized([150.0, 34.0], egui::Button::new(listener_label))
-                            .clicked()
-                        {
-                            self.toggle_listener();
+                        status_badge(ui, activity, activity_color);
+                        if self.listener_started {
+                            status_badge(ui, "IP REPORT", color_accent());
                         }
                     });
                 });
             });
 
-        egui::TopBottomPanel::bottom("bottom")
+        egui::TopBottomPanel::bottom("status_bar")
+            .exact_height(32.0)
             .frame(
                 egui::Frame::none()
-                    .fill(egui::Color32::from_rgb(238, 242, 248))
-                    .inner_margin(egui::Margin::same(6.0)),
+                    .fill(color_sidebar())
+                    .stroke(egui::Stroke::new(1.0, color_border()))
+                    .inner_margin(egui::Margin::symmetric(12.0, 6.0)),
             )
             .show(ctx, |ui| {
-                ui.label(&self.status);
+                ui.horizontal(|ui| {
+                    let activity_color = if self.apply_running {
+                        color_warning()
+                    } else if self.monitor_running || self.listener_started {
+                        color_success()
+                    } else {
+                        color_text_muted()
+                    };
+                    status_dot(ui, activity_color);
+                    ui.label(
+                        egui::RichText::new(&self.status)
+                            .small()
+                            .color(color_text_muted()),
+                    );
+                });
             });
 
         egui::CentralPanel::default()
-            .frame(egui::Frame::none().fill(egui::Color32::from_rgb(245, 247, 251)))
-            .show(ctx, |ui| {
-                egui::ScrollArea::vertical()
-                    .auto_shrink([false, false])
-                    .show(ui, |ui| {
-                        ui.add_space(6.0);
-                        self.render_rack_map(ui);
-
-                        ui.add_space(10.0);
-
-                        ui.horizontal_top(|ui| {
-                            let card_stroke = egui::Stroke::new(1.5, egui::Color32::from_rgb(185, 198, 220));
-                            let card_margin = egui::Margin::same(12.0);
-
-                            egui::Frame::none()
-                                .fill(egui::Color32::WHITE)
-                                .stroke(card_stroke)
-                                .rounding(egui::Rounding::same(8.0))
-                                .inner_margin(card_margin)
-                                .show(ui, |ui| {
-                                    ui.set_min_size(egui::vec2(340.0, 165.0));
-                                    ui.set_max_width(360.0);
-                                    ui.vertical(|ui| {
-                                        ui.horizontal(|ui| {
-                                            ui.heading("1. Connection");
-                                            help_icon(ui, "Connection settings control the UDP listener and how fast the app pushes miner changes. Advanced settings can override gateway for sites that do not use target-subnet .254.");
-                                        });
-                                        ui.separator();
-
-                                        ui.horizontal(|ui| {
-                                            ui.label("UDP port");
-                                            ui.add(egui::DragValue::new(&mut self.listen_port).speed(1));
-                                        });
-                                        ui.horizontal(|ui| {
-                                            ui.label("Parallel jobs");
-                                            ui.add(egui::DragValue::new(&mut self.parallel_jobs).clamp_range(1..=64).speed(1));
-                                        });
-                                        ui.horizontal(|ui| {
-                                            ui.label("Timeout");
-                                            ui.add(egui::DragValue::new(&mut self.timeout_secs).speed(1));
-                                            ui.label("Delay");
-                                            ui.add(egui::DragValue::new(&mut self.apply_delay_secs).speed(1));
-                                        });
-
-                                        ui.separator();
-                                        ui.checkbox(&mut self.reject_wrong_subnet_reports, "Reject wrong-subnet reports");
-
-                                        ui.separator();
-                                        ui.collapsing("Advanced auth / network settings", |ui| {
-                                            ui.label("Mode: Auto VNISH + Bitmain Stock/Hiveon");
-                                            ui.horizontal(|ui| {
-                                                ui.label("VNISH pwd");
-                                                ui.add(egui::TextEdit::singleline(&mut self.vnish_password).password(true).desired_width(80.0));
-                                            });
-                                            ui.horizontal(|ui| {
-                                                ui.label("Stock user");
-                                                ui.add(egui::TextEdit::singleline(&mut self.stock_user).desired_width(80.0));
-                                                ui.label("Stock pwd");
-                                                ui.add(egui::TextEdit::singleline(&mut self.stock_password).password(true).desired_width(80.0));
-                                            });
-                                            ui.horizontal(|ui| {
-                                                ui.label("Netmask");
-                                                ui.add(egui::TextEdit::singleline(&mut self.netmask).desired_width(120.0));
-                                            });
-                                            ui.horizontal(|ui| {
-                                                ui.label("Gateway");
-                                                ui.add(egui::TextEdit::singleline(&mut self.gateway_override).hint_text("blank = auto .254").desired_width(130.0));
-                                            });
-                                            ui.horizontal(|ui| {
-                                                ui.label("DNS1");
-                                                ui.add(egui::TextEdit::singleline(&mut self.dns1).desired_width(95.0));
-                                                ui.label("DNS2");
-                                                ui.add(egui::TextEdit::singleline(&mut self.dns2).desired_width(95.0));
-                                            });
-                                        });
-                                    });
-                                });
-
-                            ui.add_space(10.0);
-
-                            egui::Frame::none()
-                                .fill(egui::Color32::WHITE)
-                                .stroke(card_stroke)
-                                .rounding(egui::Rounding::same(8.0))
-                                .inner_margin(card_margin)
-                                .show(ui, |ui| {
-                                    ui.set_min_size(egui::vec2(455.0, 165.0));
-                                    ui.set_max_width(485.0);
-                                    ui.vertical(|ui| {
-                                        ui.horizontal(|ui| {
-                                            ui.heading("2. Capture rack order");
-                                            help_icon(ui, "Type the first target IP, start listening, then press miner IP Report buttons in physical order. The app uses the typed start IP automatically on the first report.");
-                                        });
-                                        ui.separator();
-
-                                        ui.horizontal(|ui| {
-                                            ui.label("Start target IP");
-                                            ui.add_sized([145.0, 24.0], egui::TextEdit::singleline(&mut self.start_ip_input).hint_text("10.5.9.1"));
-                                            if ui.button("Reset Next").clicked() {
-                                                self.set_start_ip();
-                                            }
-                                        });
-
-                                        ui.horizontal(|ui| {
-                                            ui.label("Next target");
-                                            ui.strong(self.next_target_ip.map(|ip| ip.to_string()).unwrap_or_else(|| "Uses start IP on first report".to_string()));
-                                        });
-
-                                        ui.separator();
-
-                                        ui.horizontal(|ui| {
-                                            ui.label("Skip reason");
-                                            ui.add_sized([180.0, 24.0], egui::TextEdit::singleline(&mut self.skip_reason_input));
-                                            if ui.button("Skip Next").clicked() { self.skip_next_target(); }
-                                        });
-
-                                        ui.separator();
-
-                                        ui.horizontal(|ui| {
-                                            if ui.button("Delete Selected").clicked() { self.delete_selected_entry(); }
-                                            if ui.button("Undo Last").clicked() { self.undo_last_entry(); }
-                                            if ui.button("Cancel Redo").clicked() { self.cancel_redo(); }
-                                        });
-                                    });
-                                });
-
-                            ui.add_space(10.0);
-
-                            egui::Frame::none()
-                                .fill(egui::Color32::WHITE)
-                                .stroke(card_stroke)
-                                .rounding(egui::Rounding::same(8.0))
-                                .inner_margin(card_margin)
-                                .show(ui, |ui| {
-                                    ui.set_min_size(egui::vec2(330.0, 165.0));
-                                    ui.set_max_width(360.0);
-                                    ui.vertical(|ui| {
-                                        ui.horizontal(|ui| {
-                                            ui.heading("3. Apply");
-                                            help_icon(ui, "Apply Safe Order automatically rebuilds the safe order first, skips miners already on the correct IP, then applies only needed changes. Pre-check tests planned targets before applying.");
-                                        });
-                                        ui.separator();
-
-                                        if ui
-                                            .add_enabled_ui(!self.apply_running, |ui| {
-                                                ui.add_sized(
-                                                    [220.0, 34.0],
-                                                    egui::Button::new("Apply Safe Order"),
-                                                )
-                                            })
-                                            .inner
-                                            .clicked()
-                                        {
-                                            self.apply_safe_order();
-                                        }
-
-                                        if self.apply_running {
-                                            ui.label(if self.apply_queued {
-                                                "Applying now; another batch is queued."
-                                            } else {
-                                                "Applying changes..."
-                                            });
-                                        }
-
-                                        if ui.add_sized([220.0, 28.0], egui::Button::new("Pre-check Planned Changes")).clicked() {
-                                            self.run_prechecks();
-                                        }
-
-                                        ui.horizontal(|ui| {
-                                            if ui.button("Export Plan CSV").clicked() { self.export_plan(); }
-                                            if ui.button("Export Results").clicked() { self.export_apply_results_csv(); }
-                                        });
-
-                                        ui.separator();
-
-                                        ui.horizontal(|ui| {
-                                            ui.label("Parking");
-                                            ui.strong("168-240");
-                                        });
-                                        ui.horizontal(|ui| {
-                                            ui.label("Steps");
-                                            ui.strong(self.apply_steps.len().to_string());
-                                            ui.separator();
-                                            ui.label("Failed");
-                                            ui.strong(self.failed_count().to_string());
-                                        });
-                                    });
-                                });
-                        });
-
-                        ui.add_space(8.0);
-
-                        egui::Frame::none()
-                            .fill(egui::Color32::WHITE)
-                            .stroke(egui::Stroke::new(1.5, egui::Color32::from_rgb(185, 198, 220)))
-                            .rounding(egui::Rounding::same(8.0))
-                            .inner_margin(egui::Margin::same(10.0))
-                            .show(ui, |ui| {
-                                ui.horizontal(|ui| {
-                                    ui.heading("Miners / scan + apply results");
-                                    ui.separator();
-                                    if let Some(line) = self.selected_line {
-                                        ui.label(format!("Selected line: {}", line));
-                                    } else {
-                                        ui.label("Selected line: none");
-                                    }
-                                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                                        ui.checkbox(&mut self.auto_scroll_miners, "Auto-scroll");
-                                    });
-                                });
-
-                                egui::ScrollArea::both()
-                                    .id_source("miner_scroll")
-                                    .max_height(590.0)
-                                    .auto_shrink([false, false])
-                                    .stick_to_bottom(self.auto_scroll_miners)
-                                    .show(ui, |ui| {
-                                        egui::Grid::new("miner_grid").striped(true).min_col_width(95.0).spacing(egui::vec2(16.0, 6.0)).show(ui, |ui| {
-                                            ui.strong("Line");
-                                            ui.strong("Current IP");
-                                            ui.strong("Target IP");
-                                            ui.strong("MAC");
-                                            ui.strong("Status");
-                                            ui.strong("Apply");
-                                            ui.end_row();
-
-                                            for _ in 0..6 {
-                                                ui.separator();
-                                            }
-                                            ui.end_row();
-
-                                            let mut clicked_line: Option<usize> = None;
-
-                                            for row in &self.rows {
-                                                let selected = self.selected_line == Some(row.line);
-
-                                                if ui.selectable_label(selected, row.line.to_string()).clicked() {
-                                                    clicked_line = Some(row.line);
-                                                }
-                                                if ui.selectable_label(selected, &row.current_ip).clicked() {
-                                                    clicked_line = Some(row.line);
-                                                }
-                                                if ui.selectable_label(selected, &row.target_ip).clicked() {
-                                                    clicked_line = Some(row.line);
-                                                }
-                                                if ui.selectable_label(selected, &row.mac).clicked() {
-                                                    clicked_line = Some(row.line);
-                                                }
-                                                if ui.selectable_label(selected, &row.status).clicked() {
-                                                    clicked_line = Some(row.line);
-                                                }
-                                                if ui.selectable_label(selected, &row.apply_status).clicked() {
-                                                    clicked_line = Some(row.line);
-                                                }
-                                                ui.end_row();
-
-                                                for _ in 0..6 {
-                                                    ui.separator();
-                                                }
-                                                ui.end_row();
-                                            }
-
-                                            if let Some(line) = clicked_line {
-                                                self.select_row_for_redo(line);
-                                            }
-
-                                            if self.auto_scroll_miners && self.scroll_to_bottom_next {
-                                                ui.scroll_to_cursor(Some(egui::Align::BOTTOM));
-                                                self.scroll_to_bottom_next = false;
-                                            }
-                                        });
-                                    });
-                            });
-
-                                    ui.add_space(8.0);
-                    });
+            .frame(
+                egui::Frame::none()
+                    .fill(color_app_bg())
+                    .inner_margin(egui::Margin::same(12.0)),
+            )
+            .show(ctx, |ui| match self.active_view {
+                AppView::RackDashboard => self.render_rack_dashboard(ui),
+                AppView::IpAssignment => self.render_ip_assignment(ui),
+                AppView::Settings => self.render_settings(ui),
             });
-
-        ctx.request_repaint_after(Duration::from_millis(250));
     }
 }
 
-fn help_icon(ui: &mut egui::Ui, text: &str) {
-    ui.add(
-        egui::Label::new(
-            egui::RichText::new("?")
-                .strong()
-                .color(egui::Color32::from_rgb(20, 43, 110))
-                .background_color(egui::Color32::from_rgb(230, 235, 248)),
-        )
-        .sense(egui::Sense::hover()),
-    )
-    .on_hover_text(text);
+fn slot_cell(
+    ui: &mut egui::Ui,
+    label: &str,
+    size: egui::Vec2,
+    fill: egui::Color32,
+    text_color: egui::Color32,
+    stroke: egui::Stroke,
+) -> egui::Response {
+    let (rect, response) = ui.allocate_exact_size(size, egui::Sense::click());
+    let visible_fill = if response.hovered() {
+        fill.linear_multiply(1.16)
+    } else {
+        fill
+    };
+    ui.painter()
+        .rect_filled(rect, egui::Rounding::same(3.0), visible_fill);
+    ui.painter()
+        .rect_stroke(rect, egui::Rounding::same(3.0), stroke);
+    ui.painter().text(
+        rect.center(),
+        egui::Align2::CENTER_CENTER,
+        label,
+        egui::FontId::new(8.5, egui::FontFamily::Monospace),
+        text_color,
+    );
+    response
 }
 
 fn detail_metric(ui: &mut egui::Ui, label: &str, value: &str) {
     egui::Frame::none()
-        .fill(egui::Color32::from_rgb(31, 28, 57))
-        .rounding(egui::Rounding::same(5.0))
-        .inner_margin(egui::Margin::symmetric(7.0, 5.0))
+        .fill(color_surface_high())
+        .stroke(egui::Stroke::new(1.0, color_border()))
+        .rounding(egui::Rounding::same(6.0))
+        .inner_margin(egui::Margin::symmetric(9.0, 7.0))
         .show(ui, |ui| {
+            ui.set_min_width(ui.available_width());
             ui.vertical(|ui| {
                 ui.label(
                     egui::RichText::new(label)
                         .size(10.0)
-                        .color(egui::Color32::from_rgb(170, 176, 210)),
+                        .strong()
+                        .color(color_text_muted()),
                 );
                 ui.label(
                     egui::RichText::new(value)
+                        .size(15.0)
                         .strong()
-                        .color(egui::Color32::WHITE),
+                        .color(color_text()),
                 );
             });
         });
 }
 
-fn count_chip(ui: &mut egui::Ui, label: &str, count: usize, total: usize, color: egui::Color32) {
-    let percent = if total > 0 {
-        (count as f32 / total as f32) * 100.0
-    } else {
-        0.0
-    };
+fn section_label(ui: &mut egui::Ui, label: &str) {
+    ui.label(
+        egui::RichText::new(label)
+            .size(10.5)
+            .strong()
+            .color(color_text_muted()),
+    );
+}
 
+fn toolbar_label(ui: &mut egui::Ui, label: &str) {
+    ui.label(
+        egui::RichText::new(label)
+            .size(10.0)
+            .strong()
+            .color(color_text_muted()),
+    );
+}
+
+fn soft_tint(color: egui::Color32, alpha: u8) -> egui::Color32 {
+    egui::Color32::from_rgba_unmultiplied(color.r(), color.g(), color.b(), alpha)
+}
+
+fn status_dot(ui: &mut egui::Ui, color: egui::Color32) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(8.0, 8.0), egui::Sense::hover());
+    ui.painter().circle_filled(rect.center(), 3.5, color);
+}
+
+fn status_badge(ui: &mut egui::Ui, text: &str, color: egui::Color32) {
     egui::Frame::none()
-        .fill(egui::Color32::from_rgb(36, 39, 62))
-        .stroke(egui::Stroke::new(1.0, color))
+        .fill(soft_tint(color, 32))
+        .stroke(egui::Stroke::new(1.0, soft_tint(color, 105)))
         .rounding(egui::Rounding::same(5.0))
-        .inner_margin(egui::Margin::symmetric(7.0, 4.0))
+        .inner_margin(egui::Margin::symmetric(8.0, 4.0))
         .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                status_dot(ui, color);
+                ui.label(egui::RichText::new(text).size(10.5).strong().color(color));
+            });
+        });
+}
+
+fn mode_button(
+    ui: &mut egui::Ui,
+    label: &str,
+    selected: bool,
+    color: egui::Color32,
+) -> egui::Response {
+    ui.add(
+        egui::Button::new(egui::RichText::new(label).color(if selected {
+            color
+        } else {
+            color_text_muted()
+        }))
+        .fill(if selected {
+            soft_tint(color, 30)
+        } else {
+            color_surface_high()
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if selected { color } else { color_border() },
+        )),
+    )
+}
+
+fn nav_button(ui: &mut egui::Ui, icon: &str, label: &str, selected: bool) -> egui::Response {
+    let response = ui.add_sized(
+        [ui.available_width(), 42.0],
+        egui::Button::new(
+            egui::RichText::new(format!("{}   {}", icon, label))
+                .size(13.0)
+                .color(if selected {
+                    color_text()
+                } else {
+                    color_text_muted()
+                }),
+        )
+        .fill(if selected {
+            color_accent_soft()
+        } else {
+            color_sidebar()
+        })
+        .stroke(egui::Stroke::new(
+            1.0,
+            if selected {
+                soft_tint(color_accent(), 115)
+            } else {
+                egui::Color32::TRANSPARENT
+            },
+        )),
+    );
+    if selected {
+        let marker = egui::Rect::from_min_max(
+            response.rect.left_top() + egui::vec2(1.0, 7.0),
+            response.rect.left_bottom() + egui::vec2(4.0, -7.0),
+        );
+        ui.painter()
+            .rect_filled(marker, egui::Rounding::same(1.5), color_accent());
+    }
+    response
+}
+
+fn brand_mark(ui: &mut egui::Ui, size: f32) {
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(size, size), egui::Sense::hover());
+    ui.painter().rect_filled(
+        rect,
+        egui::Rounding::same(8.0),
+        egui::Color32::from_rgb(18, 45, 72),
+    );
+    ui.painter().rect_stroke(
+        rect,
+        egui::Rounding::same(8.0),
+        egui::Stroke::new(1.0, soft_tint(color_accent(), 135)),
+    );
+
+    let link_height = size * 0.24;
+    let link_width = size * 0.39;
+    let center = rect.center();
+    let left = egui::Rect::from_center_size(
+        center - egui::vec2(size * 0.13, 0.0),
+        egui::vec2(link_width, link_height),
+    );
+    let right = egui::Rect::from_center_size(
+        center + egui::vec2(size * 0.13, 0.0),
+        egui::vec2(link_width, link_height),
+    );
+    let stroke = egui::Stroke::new(2.2, color_text());
+    ui.painter()
+        .rect_stroke(left, egui::Rounding::same(3.0), stroke);
+    ui.painter()
+        .rect_stroke(right, egui::Rounding::same(3.0), stroke);
+    ui.painter().line_segment(
+        [
+            center - egui::vec2(size * 0.09, 0.0),
+            center + egui::vec2(size * 0.09, 0.0),
+        ],
+        egui::Stroke::new(2.6, color_text()),
+    );
+}
+
+fn sidebar_stat(ui: &mut egui::Ui, label: &str, value: &str) {
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(label).small().color(color_text_muted()));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             ui.label(
-                egui::RichText::new(format!("{} {} ({:.0}%)", label, count, percent))
-                    .color(egui::Color32::WHITE)
-                    .strong(),
+                egui::RichText::new(value)
+                    .small()
+                    .strong()
+                    .color(color_text()),
             );
         });
+    });
+}
+
+fn header_metric(ui: &mut egui::Ui, label: &str, count: usize, color: egui::Color32) {
+    ui.vertical(|ui| {
+        ui.horizontal(|ui| {
+            status_dot(ui, color);
+            ui.label(
+                egui::RichText::new(label)
+                    .size(10.0)
+                    .strong()
+                    .color(color_text_muted()),
+            );
+        });
+        ui.horizontal(|ui| {
+            ui.label(
+                egui::RichText::new(count.to_string())
+                    .size(15.0)
+                    .strong()
+                    .color(color_text()),
+            );
+        });
+    });
+}
+
+fn monitor_state_color(state: SlotMonitorState) -> egui::Color32 {
+    match state {
+        SlotMonitorState::VnishMiner => color_accent(),
+        SlotMonitorState::BitmainMiner => egui::Color32::from_rgb(43, 177, 157),
+        SlotMonitorState::AuthRequired => egui::Color32::from_rgb(150, 112, 219),
+        SlotMonitorState::WebOnline => egui::Color32::from_rgb(93, 160, 181),
+        SlotMonitorState::SshOnly => egui::Color32::from_rgb(126, 137, 153),
+        SlotMonitorState::Offline => color_danger(),
+        SlotMonitorState::Unknown => color_text_muted(),
+    }
+}
+
+fn detail_row(ui: &mut egui::Ui, label: &str, value: &str) {
+    ui.label(egui::RichText::new(label).small().color(color_text_muted()));
+    ui.label(
+        egui::RichText::new(value)
+            .small()
+            .strong()
+            .color(color_text()),
+    );
+    ui.end_row();
+}
+
+fn table_heading(ui: &mut egui::Ui, heading: &str) {
+    ui.label(
+        egui::RichText::new(heading)
+            .size(10.0)
+            .strong()
+            .color(color_text_muted()),
+    );
+}
+
+fn table_status(ui: &mut egui::Ui, status: &str) {
+    let lower = status.to_ascii_lowercase();
+    let color = if lower.contains("fail") || lower.contains("error") || lower.contains("blocked") {
+        color_danger()
+    } else if lower.contains("applied")
+        || lower.contains("complete")
+        || lower.contains("correct")
+        || lower.contains("success")
+        || lower.contains("already")
+    {
+        color_success()
+    } else if lower.contains("pending")
+        || lower.contains("waiting")
+        || lower.contains("queued")
+        || lower.contains("applying")
+    {
+        color_warning()
+    } else if lower.contains("captured") || lower.contains("reported") || lower.contains("ready") {
+        color_accent()
+    } else {
+        color_text_muted()
+    };
+    status_badge(ui, status, color);
+}
+
+fn empty_assignment_state(ui: &mut egui::Ui, listener_started: bool) {
+    ui.vertical_centered(|ui| {
+        let (rect, _) = ui.allocate_exact_size(egui::vec2(44.0, 44.0), egui::Sense::hover());
+        ui.painter()
+            .circle_stroke(rect.center(), 20.0, egui::Stroke::new(1.0, color_border()));
+        ui.painter().line_segment(
+            [
+                rect.center() + egui::vec2(-9.0, -5.0),
+                rect.center() + egui::vec2(9.0, -5.0),
+            ],
+            egui::Stroke::new(1.8, color_text_muted()),
+        );
+        ui.painter().line_segment(
+            [
+                rect.center() + egui::vec2(-9.0, 5.0),
+                rect.center() + egui::vec2(9.0, 5.0),
+            ],
+            egui::Stroke::new(1.8, color_text_muted()),
+        );
+        ui.add_space(8.0);
+        ui.label(
+            egui::RichText::new("No miners captured")
+                .size(17.0)
+                .strong()
+                .color(color_text()),
+        );
+        ui.label(
+            egui::RichText::new(if listener_started {
+                "IP Report listener is active"
+            } else {
+                "IP Report listener is stopped"
+            })
+            .color(if listener_started {
+                color_success()
+            } else {
+                color_text_muted()
+            }),
+        );
+    });
+}
+
+fn settings_header(ui: &mut egui::Ui, title: &str, subtitle: &str) {
+    ui.label(
+        egui::RichText::new(title)
+            .size(15.0)
+            .strong()
+            .color(color_text()),
+    );
+    ui.label(
+        egui::RichText::new(subtitle)
+            .small()
+            .color(color_text_muted()),
+    );
+}
+
+fn settings_summary(ui: &mut egui::Ui, label: &str, value: &str) {
+    ui.vertical(|ui| {
+        section_label(ui, label);
+        ui.label(
+            egui::RichText::new(value)
+                .size(15.0)
+                .strong()
+                .color(color_text()),
+        );
+    });
 }
 
 fn load_app_icon() -> egui::IconData {
@@ -3822,14 +4935,73 @@ fn main() -> eframe::Result<()> {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1220.0, 860.0])
             .with_min_inner_size([1050.0, 720.0])
-            .with_title("BlockOps Static IP Tool")
+            .with_title("BlockOps Static IP Manager")
             .with_icon(load_app_icon()),
         ..Default::default()
     };
 
     eframe::run_native(
-        "BlockOps Static IP Tool",
+        "BlockOps Static IP Manager",
         options,
-        Box::new(|_cc| Box::<BlockOpsApp>::default()),
+        Box::new(|cc| {
+            configure_egui(&cc.egui_ctx);
+            Box::<BlockOpsApp>::default()
+        }),
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn normalizes_common_mac_formats() {
+        assert_eq!(normalize_mac("AA-BB-CC-DD-EE-FF"), "aa:bb:cc:dd:ee:ff");
+        assert_eq!(normalize_mac("AABBCCDDEEFF"), "aa:bb:cc:dd:ee:ff");
+    }
+
+    #[test]
+    fn validates_only_ipv4_addresses() {
+        assert!(valid_ip("10.4.19.168"));
+        assert!(!valid_ip("10.4.19.999"));
+        assert!(!valid_ip("2001:db8::1"));
+    }
+
+    #[test]
+    fn next_address_stays_inside_assignable_host_range() {
+        assert_eq!(
+            next_ipv4(Ipv4Addr::new(10, 4, 1, 167)),
+            Some(Ipv4Addr::new(10, 4, 1, 168))
+        );
+        assert_eq!(next_ipv4(Ipv4Addr::new(10, 4, 1, 254)), None);
+    }
+
+    #[test]
+    fn parking_address_skips_used_hosts() {
+        let used = HashSet::from(["10.4.7.168".to_string(), "10.4.7.169".to_string()]);
+        assert_eq!(
+            parking_ip_for_target("10.4.7.42", &used),
+            Some("10.4.7.170".to_string())
+        );
+    }
+
+    #[test]
+    fn gateway_override_supports_auto_and_rejects_invalid_values() {
+        assert_eq!(
+            gateway_for_target_with_override("10.4.8.12", "").unwrap(),
+            "10.4.8.254"
+        );
+        assert_eq!(
+            gateway_for_target_with_override("10.4.8.12", "10.4.8.1").unwrap(),
+            "10.4.8.1"
+        );
+        assert!(gateway_for_target_with_override("10.4.8.12", "gateway").is_err());
+    }
+
+    #[test]
+    fn parses_ip_report_payload_and_normalizes_mac() {
+        let report = parse_report_packet(b"ip=10.4.3.77 mac=AA-BB-CC-DD-EE-FF", "10.4.3.12");
+        assert_eq!(report.current_ip, "10.4.3.77");
+        assert_eq!(report.mac, "aa:bb:cc:dd:ee:ff");
+    }
 }

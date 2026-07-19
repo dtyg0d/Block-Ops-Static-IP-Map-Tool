@@ -1,7 +1,7 @@
 @echo off
-title Build BlockOps Rust EXE
+title Build BlockOps Static IP Manager
 echo.
-echo Building BlockOps Static IP Tool in Rust...
+echo Building BlockOps Static IP Manager in Rust...
 echo.
 
 where cargo >nul 2>nul
@@ -22,11 +22,11 @@ if %errorlevel% neq 0 (
 )
 
 mkdir dist 2>nul
-copy /Y target\release\blockops_static_ip_tool.exe dist\BlockOps_Static_IP_Tool.exe
+copy /Y target\release\blockops_static_ip_tool.exe dist\BlockOps_Static_IP_Manager.exe
 
 echo.
 echo Done.
 echo Ready-to-distribute EXE:
-echo dist\BlockOps_Static_IP_Tool.exe
+echo dist\BlockOps_Static_IP_Manager.exe
 echo.
 pause
