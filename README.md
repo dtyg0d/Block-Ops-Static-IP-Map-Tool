@@ -1,7 +1,12 @@
 # BlockOps Static IP Tool 
 <img width="1915" height="1020" alt="image" src="https://github.com/user-attachments/assets/a1e1525b-cd2a-4bbe-8779-5b644e565bc7" />
+RACK MAP VIEW
 <img width="1917" height="1021" alt="image" src="https://github.com/user-attachments/assets/1baa373d-aa01-40ce-b0ea-7ab49cb79b24" />
-<img width="1917" height="1025" alt="image" src="https://github.com/user-attachments/assets/d23dd878-5cec-4005-8bb9-89af9eef6862" />
+TRADITIONAL STATIC SETTER MODE
+<img width="530" height="942" alt="image" src="https://github.com/user-attachments/assets/7b2b8c80-99c7-400e-8981-e876c2faa7c8" />
+MINER INFO CARD 
+
+
 
 
 
